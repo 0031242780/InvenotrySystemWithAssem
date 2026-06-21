@@ -51,4 +51,9 @@ public class Supplier {
 		this.active = active;
 	}
 
+	@Override
+	public String toString() {
+		return this.companyName;
+	}
+
 }

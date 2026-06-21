@@ -8,6 +8,24 @@ public class Order {
 	private int accountId;
 	private Integer companyId;
 	private String companyName;
+	private String statusName;
+	private String customerName;
+
+	public String getStatusName() {
+		return statusName;
+	}
+
+	public void setStatusName(String statusName) {
+		this.statusName = statusName;
+	}
+
+	public String getCustomerName() {
+		return customerName;
+	}
+
+	public void setCustomerName(String customerName) {
+		this.customerName = customerName;
+	}
 
 	public String getCompanyName() {
 		return companyName;
@@ -56,5 +74,4 @@ public class Order {
 	public void setCompanyId(Integer companyId) {
 		this.companyId = companyId;
 	}
-
 }

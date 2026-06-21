@@ -235,7 +235,15 @@ public class AdminSupplierInterface extends BorderPane {
 			clearFields();
 			showAlert(Alert.AlertType.INFORMATION, "Success", null, "Supplier Deleted Successfully!");
 		} catch (Exception e) {
-			showAlert(Alert.AlertType.ERROR, "Error", null, e.getMessage());
+			// 🔥 فحص ذكي لقيود العلاقات لمنع كراش الداتابيز وعرض تنبيه فخم
+			if (e.getMessage() != null && (e.getMessage().contains("foreign key") || e.getMessage().contains("1451"))) {
+				showAlert(Alert.AlertType.ERROR, "Integrity Constraint Error", null,
+						"Cannot delete this supplier because they are linked to existing products or stock logs in the system!\n\n"
+								+ "This supplier has historical purchase or inventory records.\n\n"
+								+ "To preserve data integrity, please delete or re-assign their associated products first, or simply update the supplier's status to inactive (Deactivated) instead of permanent deletion.");
+			} else {
+				showAlert(Alert.AlertType.ERROR, "Error", null, e.getMessage());
+			}
 		}
 	}
 
@@ -269,6 +277,11 @@ public class AdminSupplierInterface extends BorderPane {
 		alert.setTitle(title);
 		alert.setHeaderText(header);
 		alert.setContentText(content);
+
+		// 🔥 السطر السحري: بخلي حجم البوكس يتلائم تلقائياً مع حجم النص بدون أي زيادة أو
+		// نقصان
+		alert.getDialogPane().setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+
 		alert.showAndWait();
 	}
 }

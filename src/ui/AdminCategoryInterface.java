@@ -1,189 +1,292 @@
 package ui;
 
-import dao.CategoryDAO;
+import dao.DBConnection;
+import dao.ProductDAO;
+import model.Category;
+import model.Product;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
-import model.Category;
+import javafx.scene.layout.*;
 
-public class AdminCategoryInterface extends BorderPane {
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 
-	private TableView<Category> table;
+public class AdminCategoryInterface extends VBox {
+
+	private TableView<Category> categoryTable;
+	private ObservableList<Category> categoriesList = FXCollections.observableArrayList();
+	private TableView<Product> productTable;
+	private ObservableList<Product> productsList = FXCollections.observableArrayList();
 
 	private TextField nameField;
 	private TextField descField;
 
-	private CategoryDAO dao;
+	private Button addBtn;
+	private Button updateBtn;
+	private Button deleteBtn;
+	private Button refreshBtn;
+	private Button clearBtn;
 
-	private ObservableList<Category> list;
+	private ProductDAO productDAO;
 
 	public AdminCategoryInterface() {
+		productDAO = new ProductDAO();
 
-		dao = new CategoryDAO();
-
-		// إضافة حواف داخلية مريحة للعين حول الشاشة بأكملها
+		setSpacing(15);
 		setPadding(new Insets(20));
 
-		createTable();
-		createForm();
-
-		loadCategories();
-	}
-
-	private void createTable() {
-
-		table = new TableView<>();
-
-		// استخدام السياسة الحرّة لتوزيع الأعمدة يدوياً بالملّي ومنع العمود الزائد
-		table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-
-		TableColumn<Category, Integer> id = new TableColumn<>("ID");
-		id.setCellValueFactory(new PropertyValueFactory<>("categoryId"));
-
-		TableColumn<Category, String> name = new TableColumn<>("Name");
-		name.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
-
-		TableColumn<Category, String> desc = new TableColumn<>("Description");
-		desc.setCellValueFactory(new PropertyValueFactory<>("description"));
-
-		// 🔥 توزيع المساحات هندسياً ليعطى الوصف مساحة أكبر (المجموع 100%)
-		id.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15)); // 15%
-		name.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.35)); // 35%
-		desc.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.50)); // 50%
-
-		table.getColumns().addAll(id, name, desc);
-
-		setCenter(table);
-	}
-
-	private void createForm() {
-
-		// 1. 🔥 إضافة العنوان العلوي للشاشة وتنسيقه ليتطابق مع باقي النظام
+		// العنوان الرئيسي للشاشة
 		Label mainTitle = new Label("Categories Management");
 		mainTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
+		GridPane form = new GridPane();
+		form.setHgap(10);
+		form.setVgap(10);
+
+		form.add(new Label("Category Name:"), 0, 0);
 		nameField = new TextField();
+		nameField.setPrefWidth(250);
+		form.add(nameField, 1, 0);
+
+		form.add(new Label("Description:"), 0, 1);
 		descField = new TextField();
+		descField.setPrefWidth(250);
+		form.add(descField, 1, 1);
 
-		Button add = new Button("Add");
-		Button update = new Button("Update");
-		Button delete = new Button("Delete");
-		Button refresh = new Button("Refresh");
-		Button clear = new Button("Clear");
+		// --- بناء شريط الأزرار المتناسق والموحد ---
+		HBox buttonsBox = new HBox(12);
+		buttonsBox.setAlignment(Pos.CENTER_LEFT);
 
-		GridPane gp = new GridPane();
+		addBtn = new Button("Add");
+		updateBtn = new Button("Update");
+		deleteBtn = new Button("Delete");
+		refreshBtn = new Button("Refresh");
+		clearBtn = new Button("Clear");
 
-		// ترتيب التباعدات للفورم
-		gp.setPadding(new Insets(10, 0, 15, 0));
-		gp.setHgap(10);
-		gp.setVgap(10);
+		// 🔥 ستايل موحد لجميع الأزرار وعرض ثابت 95px لمنع تفاوت الأحجام، مع إزالة اللون
+		// الأحمر من الحذف
+		String commonButtonStyle = "-fx-font-weight: bold;";
+		double uniformWidth = 95;
 
-		gp.add(new Label("Name"), 0, 0);
-		gp.add(nameField, 1, 0);
+		addBtn.setStyle(commonButtonStyle);
+		addBtn.setPrefWidth(uniformWidth);
 
-		gp.add(new Label("Description"), 0, 1);
-		gp.add(descField, 1, 1);
+		updateBtn.setStyle(commonButtonStyle);
+		updateBtn.setPrefWidth(uniformWidth);
 
-		HBox buttons = new HBox(10, add, update, delete, refresh, clear);
+		deleteBtn.setStyle(commonButtonStyle); // طار اللون الأحمر وصار متناسق مع الطقم
+		deleteBtn.setPrefWidth(uniformWidth);
 
-		gp.add(buttons, 1, 2);
+		refreshBtn.setStyle(commonButtonStyle);
+		refreshBtn.setPrefWidth(uniformWidth);
 
-		// 2. 🔥 تجميع العنوان مع الفورم في حاوية VBox ووضعها في أعلى الـ BorderPane
-		VBox topContainer = new VBox(5);
-		topContainer.getChildren().addAll(mainTitle, gp);
+		clearBtn.setStyle(commonButtonStyle);
+		clearBtn.setPrefWidth(uniformWidth);
 
-		setTop(topContainer);
+		buttonsBox.getChildren().addAll(addBtn, updateBtn, deleteBtn, refreshBtn, clearBtn);
 
-		// 3. ----------------- إعداد الأحداث والعمليات -----------------
-		add.setOnAction(e -> {
-			try {
-				Category c = new Category();
-				c.setCategoryName(nameField.getText());
-				c.setDescription(descField.getText());
+		createCategoryTable();
 
-				dao.insert(c);
-				loadCategories();
-				clear();
-			} catch (Exception ex) {
-				showError(ex);
+		// 🔥 تعديل عنوان الجدول السفلي ليطابق تماماً عنوان الشاشة الرئيسي بالملّي
+		Label subTitle = new Label("Products Mapped inside Selected Category");
+		subTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
+		createProductTable();
+
+		getChildren().addAll(mainTitle, form, buttonsBox, categoryTable, subTitle, productTable);
+
+		setupActions();
+		loadCategories();
+	}
+
+	private void createCategoryTable() {
+		categoryTable = new TableView<>();
+		categoryTable.setPrefHeight(220);
+		categoryTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+		TableColumn<Category, Integer> idCol = new TableColumn<>("Category ID");
+		idCol.setCellValueFactory(new PropertyValueFactory<>("categoryId"));
+
+		TableColumn<Category, String> nameCol = new TableColumn<>("Category Name");
+		nameCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
+
+		TableColumn<Category, String> descCol = new TableColumn<>("Description");
+		descCol.setCellValueFactory(new PropertyValueFactory<>("description"));
+
+		categoryTable.getColumns().addAll(idCol, nameCol, descCol);
+		categoryTable.setItems(categoriesList);
+	}
+
+	private void createProductTable() {
+		productTable = new TableView<>();
+		productTable.setPrefHeight(180);
+		productTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+		TableColumn<Product, String> pNameCol = new TableColumn<>("Product Name");
+		pNameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
+
+		TableColumn<Product, String> pBarcodeCol = new TableColumn<>("Barcode");
+		pBarcodeCol.setCellValueFactory(new PropertyValueFactory<>("barcode"));
+
+		TableColumn<Product, Double> pPriceCol = new TableColumn<>("Reg. Price ($)");
+		pPriceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
+
+		productTable.getColumns().addAll(pNameCol, pBarcodeCol, pPriceCol);
+		productTable.setItems(productsList);
+	}
+
+	private void setupActions() {
+
+		categoryTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+			if (newSelection != null) {
+				nameField.setText(newSelection.getCategoryName());
+				descField.setText(newSelection.getDescription());
+				loadProductsForCategory(newSelection.getCategoryId());
+			} else {
+				productsList.clear();
 			}
 		});
 
-		update.setOnAction(e -> {
-			Category c = table.getSelectionModel().getSelectedItem();
-			if (c == null)
+		addBtn.setOnAction(e -> {
+			String name = nameField.getText().trim();
+			String desc = descField.getText().trim();
+
+			if (name.isEmpty()) {
+				showAlert(Alert.AlertType.WARNING, "Validation Warning", "Please enter a Category Name!");
 				return;
+			}
 
-			try {
-				c.setCategoryName(nameField.getText());
-				c.setDescription(descField.getText());
+			String sql = "INSERT INTO category (category_name, descrption) VALUES (?, ?)";
+			try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, name);
+				ps.setString(2, desc);
+				ps.executeUpdate();
 
-				dao.update(c);
+				showAlert(Alert.AlertType.INFORMATION, "Success", "New category '" + name + "' added successfully!");
 				loadCategories();
+				clearFields();
 			} catch (Exception ex) {
-				showError(ex);
+				showAlert(Alert.AlertType.ERROR, "Database Error", ex.getMessage());
 			}
 		});
 
-		delete.setOnAction(e -> {
-			Category c = table.getSelectionModel().getSelectedItem();
-			if (c == null)
+		updateBtn.setOnAction(e -> {
+			Category selected = categoryTable.getSelectionModel().getSelectedItem();
+			if (selected == null) {
+				showAlert(Alert.AlertType.WARNING, "Selection Error",
+						"Please select a category from the table to update!");
 				return;
+			}
 
-			try {
-				dao.delete(c.getCategoryId());
+			String name = nameField.getText().trim();
+			String desc = descField.getText().trim();
+
+			if (name.isEmpty()) {
+				showAlert(Alert.AlertType.WARNING, "Validation Warning", "Category Name cannot be empty!");
+				return;
+			}
+
+			String sql = "UPDATE category SET category_name = ?, descrption = ? WHERE category_id = ?";
+			try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, name);
+				ps.setString(2, desc);
+				ps.setInt(3, selected.getCategoryId());
+				ps.executeUpdate();
+
+				showAlert(Alert.AlertType.INFORMATION, "Success", "Category updated successfully!");
 				loadCategories();
-				clear();
+				clearFields();
 			} catch (Exception ex) {
-				showError(ex);
+				showAlert(Alert.AlertType.ERROR, "Database Error", ex.getMessage());
 			}
 		});
 
-		refresh.setOnAction(e -> loadCategories());
+		deleteBtn.setOnAction(e -> {
+			Category selected = categoryTable.getSelectionModel().getSelectedItem();
+			if (selected == null) {
+				showAlert(Alert.AlertType.WARNING, "Selection Error",
+						"Please select a category from the table to delete!");
+				return;
+			}
 
-		clear.setOnAction(e -> clear());
+			String sql = "DELETE FROM category WHERE category_id = ?";
+			try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, selected.getCategoryId());
+				ps.executeUpdate();
 
-		// مستمع الأحداث لتعبئة الحقول فور الضغط على أي سطر بالجدول
-		table.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-			if (newVal != null) {
-				nameField.setText(newVal.getCategoryName());
-				descField.setText(newVal.getDescription());
+				showAlert(Alert.AlertType.INFORMATION, "Success", "Category deleted successfully!");
+				loadCategories();
+				clearFields();
+			} catch (SQLException ex) {
+				if (ex.getErrorCode() == 1451) {
+					showAlert(Alert.AlertType.ERROR, "Integrity Constraint Error",
+							"Cannot delete this category! It already contains products. Delete or re-map those products first.");
+				} else {
+					showAlert(Alert.AlertType.ERROR, "Database Error", ex.getMessage());
+				}
+			} catch (Exception ex) {
+				showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
 			}
 		});
+
+		refreshBtn.setOnAction(e -> {
+			loadCategories();
+			clearFields();
+		});
+
+		clearBtn.setOnAction(e -> clearFields());
+	}
+
+	private void loadProductsForCategory(int categoryId) {
+		try {
+			productsList.clear();
+			ArrayList<Product> filteredProducts = productDAO.getProductsByCategory(categoryId);
+			productsList.addAll(filteredProducts);
+			productTable.refresh();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	private void loadCategories() {
 		try {
-			list = FXCollections.observableArrayList(dao.getAll());
-			table.setItems(list);
-			table.refresh();
+			categoriesList.clear();
+			String sql = "SELECT * FROM category";
+			try (Connection con = DBConnection.getConnection();
+					PreparedStatement ps = con.prepareStatement(sql);
+					ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					Category c = new Category();
+					c.setCategoryId(rs.getInt("category_id"));
+					c.setCategoryName(rs.getString("category_name"));
+					c.setDescription(rs.getString("descrption"));
+					categoriesList.add(c);
+				}
+			}
+			categoryTable.refresh();
 		} catch (Exception e) {
-			showError(e);
+			e.printStackTrace();
 		}
 	}
 
-	private void clear() {
+	private void clearFields() {
 		nameField.clear();
 		descField.clear();
-		table.getSelectionModel().clearSelection();
+		categoryTable.getSelectionModel().clearSelection();
+		productsList.clear();
 	}
 
-	private void showError(Exception e) {
-		Alert a = new Alert(Alert.AlertType.ERROR);
-		a.setTitle("Error");
-		a.setHeaderText(null);
-		a.setContentText(e.getMessage());
-		a.showAndWait();
+	private void showAlert(Alert.AlertType type, String title, String content) {
+		Alert alert = new Alert(type);
+		alert.setTitle(title);
+		alert.setHeaderText(null);
+		alert.setContentText(content);
+		alert.showAndWait();
 	}
 }

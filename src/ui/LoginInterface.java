@@ -88,10 +88,11 @@ public class LoginInterface {
 				return;
 			}
 
-			if (account.getEmail().toLowerCase().endsWith("@admin.com")) {
-				new AdminDashboard(stage);
+			// 🔥 التعديل هان: تعديل الفحص ليطابق النطاق الرسمي المعتمد بالسيستم @tech.com
+			if (account.getEmail().toLowerCase().endsWith("@tech.com")) {
+				new AdminDashboard(stage); // يفتح لوحة تحكم الآدمن فوراً
 			} else {
-				new UserCustomerDashboard(stage, account);
+				new UserCustomerDashboard(stage, account); // يفتح لوحة الزبون
 			}
 
 		} catch (Exception e) {

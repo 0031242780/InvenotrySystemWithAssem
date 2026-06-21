@@ -4,76 +4,74 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
-
 import model.StockMovement;
 
 public class StockMovementDAO {
 
-	public void insert(StockMovement m) throws Exception {
-
-		String sql = """
-				INSERT INTO stock_movement
-				(quantity_changed,notes,create_at,type_id,account_id,product_id)
-				VALUES(?,?,NOW(),?,?,?)
-				""";
-
-		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-
-			ps.setInt(1, m.getQuantityChanged());
-			ps.setString(2, m.getNotes());
-			ps.setInt(3, m.getTypeId());
-			ps.setInt(4, m.getAccountId());
-			ps.setInt(5, m.getProductId());
-
-			ps.executeUpdate();
-		}
-	}
-
-	public ArrayList<StockMovement> getAll() throws Exception {
-
+	// 📊 1. دالة جلب السجل الكامل بالأسماء والتاريخ المصلحة هندسياً
+	public ArrayList<StockMovement> getAllMovementsWithNames() throws Exception {
 		ArrayList<StockMovement> list = new ArrayList<>();
-
-		String sql = "SELECT * FROM stock_movement";
-
+		String sql = """
+				SELECT sm.*, p.product_name, mt.type_name
+				FROM stock_movement sm
+				INNER JOIN product p ON sm.product_id = p.product_id
+				INNER JOIN movement_type mt ON sm.type_id = mt.type_id
+				ORDER BY sm.movement_id DESC
+				""";
 		try (Connection con = DBConnection.getConnection();
 				PreparedStatement ps = con.prepareStatement(sql);
 				ResultSet rs = ps.executeQuery()) {
-
 			while (rs.next()) {
+				StockMovement sm = new StockMovement();
+				sm.setMovementId(rs.getInt("movement_id"));
+				sm.setProductId(rs.getInt("product_id"));
+				sm.setQuantityChanged(rs.getInt("quantity_changed"));
+				sm.setTypeId(rs.getInt("type_id"));
+				sm.setAccountId(rs.getInt("account_id"));
+				sm.setNotes(rs.getString("notes"));
 
-				StockMovement m = new StockMovement();
+				// تعبئة الأسماء المستخرجة من الـ JOIN
+				sm.setProductName(rs.getString("product_name"));
+				sm.setTypeName(rs.getString("type_name"));
 
-				m.setMovementId(rs.getInt("movement_id"));
-				m.setQuantityChanged(rs.getInt("quantity_changed"));
-				m.setNotes(rs.getString("notes"));
-				m.setCreatedAt(rs.getTimestamp("create_at"));
-				m.setTypeId(rs.getInt("type_id"));
-				m.setAccountId(rs.getInt("account_id"));
-				m.setProductId(rs.getInt("product_id"));
+				// 🔥 التعديل الصح هان: نقرأ العمود كـ Timestamp متوافق بالملّي مع كلاس الموديل
+				// عندك
+				sm.setCreatedAt(rs.getTimestamp("create_at"));
 
-				list.add(m);
+				list.add(sm);
 			}
 		}
-
 		return list;
 	}
 
-	public void save(StockMovement sm) throws Exception {
+	// 🔥 2. الدالة المركزية الأوتوماتيكية: تسجل الحركة بالجدول وتعدل كمية الـ
+	// inventory فوراً!
+	public static void logMovementAndUpdateStock(int productId, int qtyChanged, int typeId, String notes, int accountId,
+			Connection con) throws Exception {
+		// أ. إدخال السطر في جدول حركات المستودع تلقائياً
+		String sqlMovement = "INSERT INTO stock_movement (quantity_changed, notes, create_at, type_id, account_id, product_id) VALUES (?, ?, NOW(), ?, ?, ?)";
+		try (PreparedStatement psMove = con.prepareStatement(sqlMovement)) {
+			psMove.setInt(1, qtyChanged);
+			psMove.setString(2, notes);
+			psMove.setInt(3, typeId);
+			psMove.setInt(4, accountId);
+			psMove.setInt(5, productId);
+			psMove.executeUpdate();
+		}
 
-		// جملة الإدخال لجدول حركة المخزن بناءً على أعمدة الداتابيز عندك
-		// وبنخلي التاريخ يتسجل تلقائياً بوقت الحركة الحالي NOW()
-		String sql = "INSERT INTO stock_movement (quantity_changed, notes, create_at, type_id, account_id, product_id) VALUES (?, ?, NOW(), ?, ?, ?)";
+		// ب. تحديث جدول الـ inventory الفعلي بحساب الكميات (إضافة لو نوع 1، وطرح لو أي
+		// نوع تاني)
+		String sqlInventory = """
+				INSERT INTO inventory (product_id, quantity_in_stock) VALUES (?, ?)
+				ON DUPLICATE KEY UPDATE quantity_in_stock = quantity_in_stock + ?
+				""";
+		try (PreparedStatement psInv = con.prepareStatement(sqlInventory)) {
+			int changeEffect = (typeId == 1) ? qtyChanged : -qtyChanged; // إذا دخول بضاعة يزيد، لو تالف أو مبيعات ينقص
 
-		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-
-			ps.setInt(1, sm.getQuantityChanged());
-			ps.setString(2, sm.getNotes());
-			ps.setInt(3, sm.getTypeId());
-			ps.setInt(4, sm.getAccountId());
-			ps.setInt(5, sm.getProductId());
-
-			// تنفيذ عملية الحفظ في قاعدة البيانات
-			ps.executeUpdate();
+			psInv.setInt(1, productId);
+			psInv.setInt(2, qtyChanged); // لو أول مرة ينزل المنتج بتنزل الكمية الممررة كبداية
+			psInv.setInt(3, changeEffect); // لو المنتج موجود مسبقاً، بجمع التأثير الرياضي للكمية (+ أو -)
+			psInv.executeUpdate();
 		}
 	}
 }

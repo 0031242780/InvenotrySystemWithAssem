@@ -9,11 +9,17 @@ public class OrderDAO {
 
 	public ArrayList<Order> getAll() throws Exception {
 		ArrayList<Order> list = new ArrayList<>();
+		// استعلام فخم بدمج الاسم الأول والثاني وبجيب اسم الحالة والشركة
 		String sql = """
-				SELECT o.*, c.company_name
+				SELECT o.*, c.company_name,
+				       CONCAT(a.first_name, ' ', a.last_name) AS customer_name,
+				       s.status_name
 				FROM orders o
 				LEFT JOIN delivery_company c ON o.company_id = c.company_id
+				INNER JOIN accounts a ON o.account_id = a.account_id
+				INNER JOIN order_statuses s ON o.status_id = s.status_id
 				""";
+
 		try (Connection con = DBConnection.getConnection();
 				PreparedStatement ps = con.prepareStatement(sql);
 				ResultSet rs = ps.executeQuery()) {
@@ -23,8 +29,17 @@ public class OrderDAO {
 				o.setTotalPrice(rs.getDouble("total_price"));
 				o.setStatusId(rs.getInt("status_id"));
 				o.setAccountId(rs.getInt("account_id"));
-				o.setCompanyId(rs.getInt("company_id"));
+
+				int companyId = rs.getInt("company_id");
+				if (!rs.wasNull()) {
+					o.setCompanyId(companyId);
+				}
+
 				o.setCompanyName(rs.getString("company_name"));
+
+				// 🔥 تعبئة الأسماء الجديدة المجلوبة من الـ JOIN
+				o.setStatusName(rs.getString("status_name"));
+				o.setCustomerName(rs.getString("customer_name"));
 				list.add(o);
 			}
 		}

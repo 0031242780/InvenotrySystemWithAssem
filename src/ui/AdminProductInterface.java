@@ -1,6 +1,13 @@
 package ui;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+
+import dao.DBConnection;
 import dao.ProductDAO;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -11,6 +18,8 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import model.Product;
+import model.Category;
+import model.Supplier;
 
 public class AdminProductInterface extends VBox {
 
@@ -19,19 +28,24 @@ public class AdminProductInterface extends VBox {
 	private TableColumn<Product, String> nameCol;
 	private TableColumn<Product, String> barcodeCol;
 	private TableColumn<Product, String> descCol;
-	private TableColumn<Product, Integer> catCol;
-	private TableColumn<Product, Integer> supCol;
+	private TableColumn<Product, String> catCol;
+	private TableColumn<Product, String> supCol;
+
+	private TableColumn<Product, Double> costCol;
 	private TableColumn<Product, Double> priceCol;
 	private TableColumn<Product, Double> discountCol;
+	private TableColumn<Product, Double> percentCol;
 
 	private TextField nameField;
 	private TextField barcodeField;
 	private TextField descField;
-	private TextField catIdField;
-	private TextField supIdField;
 	private TextField priceField;
+	private TextField costField;
 
-	private CheckBox discountCheckBox;
+	private ComboBox<Category> categoryComboBox;
+	private ComboBox<Supplier> supplierComboBox;
+
+	private TextField discountPercentField;
 	private Button applyDiscountBtn;
 
 	private Button addBtn;
@@ -68,17 +82,25 @@ public class AdminProductInterface extends VBox {
 		descField = new TextField();
 		form.add(descField, 1, 2);
 
-		form.add(new Label("Category ID:"), 2, 0);
-		catIdField = new TextField();
-		form.add(catIdField, 3, 0);
+		form.add(new Label("Category:"), 2, 0);
+		categoryComboBox = new ComboBox<>();
+		categoryComboBox.setPromptText("Select Category");
+		categoryComboBox.setPrefWidth(150);
+		form.add(categoryComboBox, 3, 0);
 
-		form.add(new Label("Supplier ID:"), 2, 1);
-		supIdField = new TextField();
-		form.add(supIdField, 3, 1);
+		form.add(new Label("Supplier:"), 2, 1);
+		supplierComboBox = new ComboBox<>();
+		supplierComboBox.setPromptText("Select Supplier");
+		supplierComboBox.setPrefWidth(150);
+		form.add(supplierComboBox, 3, 1);
 
 		form.add(new Label("Price ($):"), 2, 2);
 		priceField = new TextField();
 		form.add(priceField, 3, 2);
+
+		form.add(new Label("Cost ($):"), 0, 3);
+		costField = new TextField();
+		form.add(costField, 1, 3);
 
 		createTable();
 
@@ -90,17 +112,21 @@ public class AdminProductInterface extends VBox {
 		deleteBtn = new Button("Delete");
 		refreshBtn = new Button("Refresh");
 
-		discountCheckBox = new CheckBox("Apply 50% Discount");
-		discountCheckBox.setStyle("-fx-font-weight: bold; -fx-text-fill: #2ecc71;");
+		discountPercentField = new TextField();
+		discountPercentField.setPromptText("Discount % (e.g. 20)");
+		discountPercentField.setPrefWidth(140);
 
 		applyDiscountBtn = new Button("Save Discount State");
 
-		bottomBox.getChildren().addAll(addBtn, editBtn, deleteBtn, refreshBtn, discountCheckBox, applyDiscountBtn);
+		bottomBox.getChildren().addAll(addBtn, editBtn, deleteBtn, refreshBtn, discountPercentField, applyDiscountBtn);
 
 		getChildren().addAll(mainTitle, form, table, bottomBox);
 
 		setupActions();
+
 		loadData();
+		loadCategoriesToCombo();
+		loadSuppliersToCombo();
 	}
 
 	private void createTable() {
@@ -119,11 +145,14 @@ public class AdminProductInterface extends VBox {
 		descCol = new TableColumn<>("Description");
 		descCol.setCellValueFactory(new PropertyValueFactory<>("description"));
 
-		catCol = new TableColumn<>("Category ID");
-		catCol.setCellValueFactory(new PropertyValueFactory<>("categoryId"));
+		catCol = new TableColumn<>("Category");
+		catCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
 
-		supCol = new TableColumn<>("Supplier ID");
-		supCol.setCellValueFactory(new PropertyValueFactory<>("supplierId"));
+		supCol = new TableColumn<>("Supplier");
+		supCol.setCellValueFactory(new PropertyValueFactory<>("supplierName"));
+
+		costCol = new TableColumn<>("Cost ($)");
+		costCol.setCellValueFactory(new PropertyValueFactory<>("cost"));
 
 		priceCol = new TableColumn<>("Reg. Price ($)");
 		priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
@@ -131,7 +160,39 @@ public class AdminProductInterface extends VBox {
 		discountCol = new TableColumn<>("Disc. Price ($)");
 		discountCol.setCellValueFactory(new PropertyValueFactory<>("discountPrice"));
 
+		// 🔥 تلوين السعر بعد الخصم باللون الأخضر هنا
 		discountCol.setCellFactory(column -> new TableCell<Product, Double>() {
+			@Override
+			protected void updateItem(Double item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null) {
+					setText("-");
+					setStyle("");
+					return;
+				}
+				Product p = (Product) getTableRow().getItem();
+				if (p == null || item <= 0) {
+					setText("-");
+					setStyle("");
+				} else {
+					double finalPrice = p.getPrice() - item;
+					setText(String.format("$%.2f", finalPrice));
+					setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;"); // السعر الأخضر
+				}
+			}
+		});
+
+		percentCol = new TableColumn<>("Discount %");
+		percentCol.setCellValueFactory(cellData -> {
+			Product p = cellData.getValue();
+			if (p != null && p.getDiscountPrice() > 0 && p.getPrice() > 0) {
+				double percent = (p.getDiscountPrice() / p.getPrice()) * 100;
+				return new SimpleObjectProperty<>(percent);
+			}
+			return new SimpleObjectProperty<>(0.0);
+		});
+
+		percentCol.setCellFactory(column -> new TableCell<Product, Double>() {
 			@Override
 			protected void updateItem(Double item, boolean empty) {
 				super.updateItem(item, empty);
@@ -139,22 +200,25 @@ public class AdminProductInterface extends VBox {
 					setText("-");
 					setStyle("");
 				} else {
-					setText(String.format("$%.2f", item));
-					setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;");
+					setText(String.format("%.0f%%", item));
+					setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
 				}
 			}
 		});
 
-		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.07));
-		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.18));
-		barcodeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.13));
-		descCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.22));
+		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.04));
+		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
+		barcodeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
+		descCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
 		catCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
 		supCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
-		priceCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.11));
-		discountCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.11));
+		costCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
+		priceCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
+		discountCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
+		percentCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
 
-		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, supCol, priceCol, discountCol);
+		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, supCol, costCol, priceCol, discountCol,
+				percentCol);
 		table.setItems(productsList);
 		table.setPrefHeight(350);
 	}
@@ -166,39 +230,59 @@ public class AdminProductInterface extends VBox {
 				nameField.setText(newSelection.getProductName());
 				barcodeField.setText(newSelection.getBarcode());
 				descField.setText(newSelection.getDescription());
-				catIdField.setText(String.valueOf(newSelection.getCategoryId()));
-				supIdField.setText(String.valueOf(newSelection.getSupplierId()));
 				priceField.setText(String.valueOf(newSelection.getPrice()));
+				costField.setText(String.valueOf(newSelection.getCost()));
 
-				try {
-					double existingDiscount = newSelection.getDiscountPrice();
-					if (existingDiscount > 0) {
-						discountCheckBox.setSelected(true);
-					} else {
-						discountCheckBox.setSelected(false);
+				for (Category c : categoryComboBox.getItems()) {
+					if (c.getCategoryId() == newSelection.getCategoryId()) {
+						categoryComboBox.setValue(c);
+						break;
 					}
-				} catch (Exception ex) {
-					discountCheckBox.setSelected(false);
+				}
+
+				for (Supplier s : supplierComboBox.getItems()) {
+					if (s.getSupplierId() == newSelection.getSupplierId()) {
+						supplierComboBox.setValue(s);
+						break;
+					}
+				}
+
+				double originalPrice = newSelection.getPrice();
+				double currentDiscountAmount = newSelection.getDiscountPrice();
+				if (currentDiscountAmount > 0 && originalPrice > 0) {
+					double percent = (currentDiscountAmount / originalPrice) * 100;
+					discountPercentField.setText(String.format("%.0f", percent));
+				} else {
+					discountPercentField.clear();
 				}
 			}
 		});
 
 		addBtn.setOnAction(e -> {
 			try {
+				Category selectedCat = categoryComboBox.getValue();
+				Supplier selectedSup = supplierComboBox.getValue();
+
+				if (selectedCat == null || selectedSup == null) {
+					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category and Supplier from lists!");
+					return;
+				}
+
 				Product p = new Product();
 				p.setProductName(nameField.getText());
 				p.setBarcode(barcodeField.getText());
 				p.setDescription(descField.getText());
-				p.setCategoryId(Integer.parseInt(catIdField.getText()));
-				p.setSupplierId(Integer.parseInt(supIdField.getText()));
+				p.setCategoryId(selectedCat.getCategoryId());
+				p.setSupplierId(selectedSup.getSupplierId());
 				p.setPrice(Double.parseDouble(priceField.getText()));
+				p.setCost(Double.parseDouble(costField.getText()));
 
 				productDAO.insertProduct(p);
 				showAlert(Alert.AlertType.INFORMATION, "Success", "Product added successfully!");
 				loadData();
 				clearFields();
 			} catch (Exception ex) {
-				showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+				showExceptionAlert("Add Product Transaction Failed", ex);
 			}
 		});
 
@@ -209,17 +293,29 @@ public class AdminProductInterface extends VBox {
 				return;
 			}
 			try {
+				Category selectedCat = categoryComboBox.getValue();
+				Supplier selectedSup = supplierComboBox.getValue();
+
+				if (selectedCat == null || selectedSup == null) {
+					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category and Supplier from lists!");
+					return;
+				}
+
 				selected.setProductName(nameField.getText());
 				selected.setBarcode(barcodeField.getText());
 				selected.setDescription(descField.getText());
-				selected.setCategoryId(Integer.parseInt(catIdField.getText()));
-				selected.setSupplierId(Integer.parseInt(supIdField.getText()));
+				selected.setCategoryId(selectedCat.getCategoryId());
+				selected.setSupplierId(selectedSup.getSupplierId());
 
 				double price = Double.parseDouble(priceField.getText());
 				selected.setPrice(price);
+				selected.setCost(Double.parseDouble(costField.getText()));
 
-				if (discountCheckBox.isSelected()) {
-					selected.setDiscountPrice(price * 0.50);
+				String percentText = discountPercentField.getText().trim();
+				if (!percentText.isEmpty()) {
+					double percent = Double.parseDouble(percentText);
+					double discAmount = price * (percent / 100.0);
+					selected.setDiscountPrice(discAmount);
 				} else {
 					selected.setDiscountPrice(0.0);
 				}
@@ -231,7 +327,7 @@ public class AdminProductInterface extends VBox {
 				loadData();
 				clearFields();
 			} catch (Exception ex) {
-				showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+				showExceptionAlert("Update Product Transaction Failed", ex);
 			}
 		});
 
@@ -244,14 +340,26 @@ public class AdminProductInterface extends VBox {
 					loadData();
 					clearFields();
 				} catch (Exception ex) {
-					showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+					if (ex.getMessage() != null
+							&& (ex.getMessage().contains("foreign key") || ex.getMessage().contains("1451"))) {
+						showAlert(Alert.AlertType.ERROR, "Integrity Constraint Error",
+								"Cannot delete this product because it is linked to existing transactions or orders in the system!\n\n"
+										+ "This item has historical records in customer invoices (order_item) or stock movements.\n\n"
+										+ "To preserve data integrity, please delete the associated orders first, or consider updating its stock quantity to zero instead of permanent deletion.");
+					} else {
+						showExceptionAlert("Delete Operation Failed", ex);
+					}
 				}
 			} else {
 				showAlert(Alert.AlertType.WARNING, "Warning", "Please select a product from the table first!");
 			}
 		});
 
-		refreshBtn.setOnAction(e -> loadData());
+		refreshBtn.setOnAction(e -> {
+			loadData();
+			loadCategoriesToCombo();
+			loadSuppliersToCombo();
+		});
 
 		applyDiscountBtn.setOnAction(e -> {
 			Product selectedProduct = table.getSelectionModel().getSelectedItem();
@@ -262,27 +370,74 @@ public class AdminProductInterface extends VBox {
 			}
 
 			try {
-				double calculatedDiscount = 0;
+				String percentText = discountPercentField.getText().trim();
+				double calculatedDiscountAmount = 0;
 				String message = "";
 
-				if (discountCheckBox.isSelected()) {
-					calculatedDiscount = selectedProduct.getPrice() * 0.50;
-					message = "50% Discount applied successfully! New Price: $"
-							+ String.format("%.2f", calculatedDiscount);
+				if (!percentText.isEmpty()) {
+					double percent = Double.parseDouble(percentText);
+
+					if (percent < 0 || percent > 100) {
+						showAlert(Alert.AlertType.ERROR, "Input Error", "Percentage must be between 0 and 100!");
+						return;
+					}
+
+					calculatedDiscountAmount = selectedProduct.getPrice() * (percent / 100.0);
+					double finalPrice = selectedProduct.getPrice() - calculatedDiscountAmount;
+					message = percent + "% Discount applied successfully! New Price: $"
+							+ String.format("%.2f", finalPrice);
 				} else {
-					calculatedDiscount = 0;
+					calculatedDiscountAmount = 0;
 					message = "Discount removed successfully! Product returned to original price.";
 				}
 
-				productDAO.addDiscount(selectedProduct.getProductId(), calculatedDiscount);
+				productDAO.addDiscount(selectedProduct.getProductId(), calculatedDiscountAmount);
 
 				showAlert(Alert.AlertType.INFORMATION, "Success", message);
 				loadData();
 
+			} catch (NumberFormatException nfe) {
+				showAlert(Alert.AlertType.ERROR, "Input Error", "Please enter a valid number for discount percentage!");
 			} catch (Exception ex) {
-				showAlert(Alert.AlertType.ERROR, "Database Error", ex.getMessage());
+				showExceptionAlert("Discount Process Failed", ex);
 			}
 		});
+	}
+
+	private void loadCategoriesToCombo() {
+		ObservableList<Category> options = FXCollections.observableArrayList();
+		String sql = "SELECT category_id, category_name FROM category";
+		try (Connection con = DBConnection.getConnection();
+				PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			while (rs.next()) {
+				Category c = new Category();
+				c.setCategoryId(rs.getInt("category_id"));
+				c.setCategoryName(rs.getString("category_name"));
+				options.add(c);
+			}
+			categoryComboBox.setItems(options);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void loadSuppliersToCombo() {
+		ObservableList<Supplier> options = FXCollections.observableArrayList();
+		String sql = "SELECT supplier_id, company_name FROM supplier WHERE is_active = true";
+		try (Connection con = DBConnection.getConnection();
+				PreparedStatement ps = con.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+			while (rs.next()) {
+				Supplier s = new Supplier();
+				s.setSupplierId(rs.getInt("supplier_id"));
+				s.setCompanyName(rs.getString("company_name"));
+				options.add(s);
+			}
+			supplierComboBox.setItems(options);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	private void loadData() {
@@ -299,10 +454,11 @@ public class AdminProductInterface extends VBox {
 		nameField.clear();
 		barcodeField.clear();
 		descField.clear();
-		catIdField.clear();
-		supIdField.clear();
 		priceField.clear();
-		discountCheckBox.setSelected(false);
+		costField.clear();
+		categoryComboBox.setValue(null);
+		supplierComboBox.setValue(null);
+		discountPercentField.clear();
 		table.getSelectionModel().clearSelection();
 	}
 
@@ -311,6 +467,30 @@ public class AdminProductInterface extends VBox {
 		alert.setTitle(title);
 		alert.setHeaderText(null);
 		alert.setContentText(content);
+		alert.getDialogPane().setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+		alert.showAndWait();
+	}
+
+	private void showExceptionAlert(String title, Throwable ex) {
+		ex.printStackTrace();
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("An exception occurred in the system:\n\n");
+		sb.append("Error Type: ").append(ex.getClass().getSimpleName()).append("\n");
+		sb.append("Details: ").append(ex.getMessage() != null ? ex.getMessage() : "No additional data.").append("\n");
+
+		if (ex.getCause() != null) {
+			sb.append("Root Cause: ")
+					.append(ex.getCause().getMessage() != null ? ex.getCause().getMessage() : ex.getCause().toString())
+					.append("\n");
+		}
+
+		Alert alert = new Alert(Alert.AlertType.ERROR);
+		alert.setTitle(title);
+		alert.setHeaderText("Exception Diagnostic Context");
+		alert.setContentText(sb.toString());
+
+		alert.getDialogPane().setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
 		alert.showAndWait();
 	}
 }

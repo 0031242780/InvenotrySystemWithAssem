@@ -50,7 +50,7 @@ public class AdminDashboard extends BorderPane {
 		orders.setOnAction(e -> setCenter(new AdminOrderInterface()));
 		customers.setOnAction(e -> setCenter(new AdminCustomerInterface()));
 		stock.setOnAction(e -> setCenter(new AdminStockMovementInterface()));
-		users.setOnAction(e -> setCenter(new UsersRolesInterface()));
+		users.setOnAction(e -> setCenter(new AdminRolesInterface()));
 
 		showDashboard();
 
@@ -65,7 +65,6 @@ public class AdminDashboard extends BorderPane {
 			AccountDAO adao = new AccountDAO();
 			SupplierDAO sdao = new SupplierDAO();
 
-			// صف الكروت الأفقي جنب بعض مصفصفين لوز
 			HBox cardsRow = new HBox(20);
 			cardsRow.setPadding(new Insets(10, 0, 10, 0));
 
@@ -73,11 +72,8 @@ public class AdminDashboard extends BorderPane {
 					card("Orders", "" + odao.countOrders()), card("Customers", "" + adao.getCustomers().size()),
 					card("Suppliers", "" + sdao.countSuppliers()));
 
-			// جدول مراقبة طلبات النظام الشامل بالأسفل
 			TableView<Order> systemOrdersTable = new TableView<>();
 			systemOrdersTable.setPrefHeight(350);
-
-			// 1. استخدام السياسة الافتراضية لمنع أي تعارض برمجّي مع الـ bind الجانبي
 			systemOrdersTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
 			TableColumn<Order, Integer> idCol = new TableColumn<>("Order ID");
@@ -86,44 +82,38 @@ public class AdminDashboard extends BorderPane {
 			TableColumn<Order, Double> totalCol = new TableColumn<>("Total Price");
 			totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
 
-			TableColumn<Order, Integer> statusCol = new TableColumn<>("Status ID");
-			statusCol.setCellValueFactory(new PropertyValueFactory<>("statusId"));
+			// 🔥 عرض اسم الحالة بدلاً من الـ ID
+			TableColumn<Order, String> statusCol = new TableColumn<>("Status Name");
+			statusCol.setCellValueFactory(new PropertyValueFactory<>("statusName"));
 
-			TableColumn<Order, Integer> userCol = new TableColumn<>("Customer ID");
-			userCol.setCellValueFactory(new PropertyValueFactory<>("accountId"));
+			// 🔥 عرض اسم الزبون كاملاً بدلاً من الـ ID
+			TableColumn<Order, String> userCol = new TableColumn<>("Customer Name");
+			userCol.setCellValueFactory(new PropertyValueFactory<>("customerName"));
 
-			// 2. توزيع العرض بالتساوي (25%) مع خصم 2 بكسل لحواف الجدول لمنع العمود الرمادي
-			// أو شريط التمرير
 			idCol.prefWidthProperty().bind(systemOrdersTable.widthProperty().subtract(2).multiply(0.25));
 			totalCol.prefWidthProperty().bind(systemOrdersTable.widthProperty().subtract(2).multiply(0.25));
 			statusCol.prefWidthProperty().bind(systemOrdersTable.widthProperty().subtract(2).multiply(0.25));
 			userCol.prefWidthProperty().bind(systemOrdersTable.widthProperty().subtract(2).multiply(0.25));
 
-			// أضف الأعمدة بعد ضبط أبعادها بدقة هندسية
 			systemOrdersTable.getColumns().addAll(idCol, totalCol, statusCol, userCol);
 
-			// تحميل البيانات للجدول
 			ArrayList<Order> allOrders = odao.getAll();
 			systemOrdersTable.setItems(FXCollections.observableArrayList(allOrders));
 
-			// إنشاء سطر علوي يحتوي على العنوان وكبسة الريفريش جنب بعض
 			HBox topHeaderRow = new HBox(20);
 			topHeaderRow.setAlignment(Pos.CENTER_LEFT);
 
 			Label mainTitle = new Label("Admin Control Panel");
 			mainTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
-			// تصميم كبسة الريفريش لتبدو متناسقة مع ألوان النظام
 			Button refreshBtn = new Button("Refresh 🔄");
 			refreshBtn.setStyle(
 					"-fx-background-color: #123B70; -fx-text-fill: white; -fx-font-weight: bold; -fx-cursor: hand; -fx-background-radius: 8;");
 
-			// عند الضغط على الزر، يتم إعادة استدعاء الدالة لجلب البيانات الجديدة فوراً
 			refreshBtn.setOnAction(e -> showDashboard());
 
 			topHeaderRow.getChildren().addAll(mainTitle, refreshBtn);
 
-			// تجميع الشاشة عمودياً بشكل فخم
 			VBox mainLayout = new VBox(15);
 			mainLayout.setPadding(new Insets(20));
 

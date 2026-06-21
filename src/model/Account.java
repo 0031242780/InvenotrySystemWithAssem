@@ -15,9 +15,7 @@ public class Account {
 	private String street;
 	private Timestamp createdAt;
 	private String roleName;
-
-	public Account() {
-	}
+	private boolean active;
 
 	public Account(int accountId, int roleId, String email, String password, String firstName, String lastName,
 			String phoneNumber, String city, String street, Timestamp createdAt) {
@@ -51,6 +49,17 @@ public class Account {
 
 	public int getRoleId() {
 		return roleId;
+	}
+
+	public boolean isActive() {
+		return active;
+	}
+
+	public void setActive(boolean active) {
+		this.active = active;
+	}
+
+	public Account() {
 	}
 
 	public void setRoleId(int roleId) {

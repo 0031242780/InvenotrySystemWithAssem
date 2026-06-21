@@ -8,15 +8,31 @@ public class StockMovement {
 	private int quantityChanged;
 	private String notes;
 	private Timestamp createdAt;
-
+	private String productName;
+	private String typeName;
 	private int typeId;
 	private int accountId;
 	private int productId;
-
 	private Integer supplierId;
 	private Integer orderId;
 
 	public StockMovement() {
+	}
+
+	public String getProductName() {
+		return productName;
+	}
+
+	public void setProductName(String productName) {
+		this.productName = productName;
+	}
+
+	public String getTypeName() {
+		return typeName;
+	}
+
+	public void setTypeName(String typeName) {
+		this.typeName = typeName;
 	}
 
 	public int getMovementId() {
