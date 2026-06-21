@@ -7,6 +7,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import model.Product;
+import model.Provide;
 
 public class ProductDAO {
 
@@ -184,6 +185,41 @@ public class ProductDAO {
                 p.setProductName(rs.getString("product_name"));
                 p.setQuantity(rs.getInt("stock_qty"));
                 list.add(p);
+            }
+        }
+        return list;
+    }
+
+    public ArrayList<Product> getProductsBySupplierId(int supplierId) throws Exception {
+        ArrayList<Product> list = new ArrayList<>();
+        String sql = """
+				SELECT p.product_id, p.product_name, p.barcode, p.price,
+				       c.category_name, pr.cost 
+				FROM provide pr
+				INNER JOIN product p ON pr.product_id = p.product_id
+				INNER JOIN category c ON p.category_id = c.category_id
+				WHERE pr.supplier_id = ?
+				ORDER BY p.product_name ASC
+				""";
+
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, supplierId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Product p = new Product();
+                    p.setProductId(rs.getInt("product_id"));
+                    p.setProductName(rs.getString("product_name"));
+                    p.setBarcode(rs.getString("barcode"));
+                    p.setPrice(rs.getDouble("price"));
+                    p.setCategoryName(rs.getString("category_name"));
+
+                    p.setCost(rs.getDouble("cost"));
+
+                    list.add(p);
+                }
             }
         }
         return list;

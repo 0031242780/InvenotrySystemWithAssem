@@ -42,7 +42,6 @@ public class AdminCategoryInterface extends VBox {
 		setSpacing(15);
 		setPadding(new Insets(20));
 
-		// العنوان الرئيسي للشاشة
 		Label mainTitle = new Label("Categories Management");
 		mainTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
@@ -60,7 +59,6 @@ public class AdminCategoryInterface extends VBox {
 		descField.setPrefWidth(250);
 		form.add(descField, 1, 1);
 
-		// --- بناء شريط الأزرار المتناسق والموحد ---
 		HBox buttonsBox = new HBox(12);
 		buttonsBox.setAlignment(Pos.CENTER_LEFT);
 
@@ -70,8 +68,6 @@ public class AdminCategoryInterface extends VBox {
 		refreshBtn = new Button("Refresh");
 		clearBtn = new Button("Clear");
 
-		// 🔥 ستايل موحد لجميع الأزرار وعرض ثابت 95px لمنع تفاوت الأحجام، مع إزالة اللون
-		// الأحمر من الحذف
 		String commonButtonStyle = "-fx-font-weight: bold;";
 		double uniformWidth = 95;
 
@@ -81,7 +77,7 @@ public class AdminCategoryInterface extends VBox {
 		updateBtn.setStyle(commonButtonStyle);
 		updateBtn.setPrefWidth(uniformWidth);
 
-		deleteBtn.setStyle(commonButtonStyle); // طار اللون الأحمر وصار متناسق مع الطقم
+		deleteBtn.setStyle(commonButtonStyle);
 		deleteBtn.setPrefWidth(uniformWidth);
 
 		refreshBtn.setStyle(commonButtonStyle);
@@ -94,7 +90,6 @@ public class AdminCategoryInterface extends VBox {
 
 		createCategoryTable();
 
-		// 🔥 تعديل عنوان الجدول السفلي ليطابق تماماً عنوان الشاشة الرئيسي بالملّي
 		Label subTitle = new Label("Products Mapped inside Selected Category");
 		subTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 		createProductTable();
@@ -110,16 +105,13 @@ public class AdminCategoryInterface extends VBox {
 		categoryTable.setPrefHeight(220);
 		categoryTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-		TableColumn<Category, Integer> idCol = new TableColumn<>("Category ID");
-		idCol.setCellValueFactory(new PropertyValueFactory<>("categoryId"));
-
 		TableColumn<Category, String> nameCol = new TableColumn<>("Category Name");
 		nameCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
 
 		TableColumn<Category, String> descCol = new TableColumn<>("Description");
 		descCol.setCellValueFactory(new PropertyValueFactory<>("description"));
 
-		categoryTable.getColumns().addAll(idCol, nameCol, descCol);
+		categoryTable.getColumns().addAll(nameCol, descCol);
 		categoryTable.setItems(categoriesList);
 	}
 

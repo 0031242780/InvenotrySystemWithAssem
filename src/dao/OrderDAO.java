@@ -48,14 +48,14 @@ public class OrderDAO {
     public ArrayList<Order> getByAccount(int accountId) throws Exception {
         ArrayList<Order> list = new ArrayList<>();
         String sql = """
-                SELECT o.order_id, o.status_id, o.company_id, o.account_id,
-                       (SELECT SUM(oi.quantity * oi.price_at_purchase) FROM order_item oi WHERE oi.order_id = o.order_id) AS total_price 
-                FROM orders o
-                WHERE o.account_id = ?
-                """;
+				SELECT o.order_id, o.status_id, o.company_id, o.account_id, s.status_name,
+				       (SELECT SUM(oi.quantity * oi.price_at_purchase) FROM order_item oi WHERE oi.order_id = o.order_id) AS total_price 
+				FROM orders o
+				INNER JOIN order_statuses s ON o.status_id = s.status_id
+				WHERE o.account_id = ?
+				""";
 
-        try (
-                Connection con = DBConnection.getConnection();
+        try (Connection con = DBConnection.getConnection();
                 PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, accountId);
 
@@ -65,6 +65,7 @@ public class OrderDAO {
                     o.setOrderId(rs.getInt("order_id"));
                     o.setTotalPrice(rs.getDouble("total_price"));
                     o.setStatusId(rs.getInt("status_id"));
+                    o.setStatusName(rs.getString("status_name")); // Fixed: Maps text status safely now!
 
                     int companyId = rs.getInt("company_id");
                     if (!rs.wasNull()) {

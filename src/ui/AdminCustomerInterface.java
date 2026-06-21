@@ -22,17 +22,14 @@ public class AdminCustomerInterface extends VBox {
 
 		dao = new AccountDAO();
 
-		// إعدادات التباعد والحواف الداخلية للشاشة الرئيسية
 		setSpacing(15);
 		setPadding(new Insets(20));
 
-		// 1. 🔥 إضافة وتنسيق العنوان العلوي ليتطابق مع هوية النظام البصرية
 		Label mainTitle = new Label("Customers Management");
 		mainTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
 		table = new TableView<>();
 
-		// استخدام السياسة الحرّة لتوزيع الأعمدة يدوياً بالملّي ومنع العمود الزائد
 		table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
 		TableColumn<Account, Integer> idCol = new TableColumn<>("ID");
@@ -50,8 +47,7 @@ public class AdminCustomerInterface extends VBox {
 		TableColumn<Account, String> phoneCol = new TableColumn<>("Phone");
 		phoneCol.setCellValueFactory(new PropertyValueFactory<>("phoneNumber"));
 
-		// 🔥 توزيع العرض هندسياً بالملّي (المجموع 100%) مع خصم الـ 2 بكسل السحرية
-		// للحواف
+
 		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10)); // 10%
 		firstCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20)); // 20%
 		lastCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20)); // 20%
@@ -60,20 +56,16 @@ public class AdminCustomerInterface extends VBox {
 
 		table.getColumns().addAll(idCol, firstCol, lastCol, emailCol, phoneCol);
 
-		// تعيين طول مريح ومناسب للجدول لرؤية البيانات بوضوح
 		table.setPrefHeight(400);
 
-		// إنشاء زر التحديث وتنسيق حجمه
 		Button refreshBtn = new Button("Refresh Data");
 		refreshBtn.setPadding(new Insets(10));
 		refreshBtn.setOnAction(e -> load());
 
-		// وضع زر الريفرش في شريط سفلي منسق ومحاذاته لليسار
 		HBox bottomBar = new HBox(10);
 		bottomBar.setAlignment(Pos.CENTER_LEFT);
 		bottomBar.getChildren().add(refreshBtn);
 
-		// تجميع العناصر بالترتيب الهندسي الصحيح (العنوان أولاً)
 		getChildren().addAll(mainTitle, table, bottomBar);
 
 		load();

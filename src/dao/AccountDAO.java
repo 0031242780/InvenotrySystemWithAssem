@@ -145,4 +145,25 @@ public class AccountDAO {
 		}
 		return 0;
 	}
+	public void updateProfile(Account a) throws Exception {
+		String sql = """
+				UPDATE accounts 
+				SET password_ = ?, first_name = ?, last_name = ?, phone_number = ?, city = ?, street = ? 
+				WHERE account_id = ?
+				""";
+
+		try (Connection con = DBConnection.getConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setString(1, a.getPassword());
+			ps.setString(2, a.getFirstName());
+			ps.setString(3, a.getLastName());
+			ps.setString(4, a.getPhoneNumber());
+			ps.setString(5, a.getCity());
+			ps.setString(6, a.getStreet());
+			ps.setInt(7, a.getAccountId());
+
+			ps.executeUpdate();
+		}
+	}
 }

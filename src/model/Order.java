@@ -11,6 +11,7 @@ public class Order {
 	private String statusName;
 	private String customerName;
 
+
 	public String getStatusName() {
 		return statusName;
 	}
@@ -74,4 +75,5 @@ public class Order {
 	public void setCompanyId(Integer companyId) {
 		this.companyId = companyId;
 	}
+
 }

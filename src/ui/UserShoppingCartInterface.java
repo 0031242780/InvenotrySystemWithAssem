@@ -45,9 +45,6 @@ public class UserShoppingCartInterface extends BorderPane {
 	private void createTable() {
 		table = new TableView<>();
 
-		TableColumn<CartItem, Integer> productCol = new TableColumn<>("Product ID");
-		productCol.setCellValueFactory(new PropertyValueFactory<>("productId"));
-
 		TableColumn<CartItem, String> nameCol = new TableColumn<>("Product");
 		nameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
 
@@ -57,7 +54,7 @@ public class UserShoppingCartInterface extends BorderPane {
 		TableColumn<CartItem, Double> priceCol = new TableColumn<>("Price");
 		priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
 
-		table.getColumns().addAll(productCol, nameCol, quantityCol, priceCol);
+		table.getColumns().addAll(nameCol, quantityCol, priceCol);
 		table.setPrefHeight(500);
 		table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 	}

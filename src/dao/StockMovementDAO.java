@@ -52,14 +52,23 @@ public class StockMovementDAO {
 		}
 
 		String sqlInventory = """
-				INSERT INTO inventory (product_id, quantity_in_stock) VALUES (?, 0)
-				ON DUPLICATE KEY UPDATE quantity_in_stock = quantity_in_stock + ?
+				INSERT INTO inventory (product_id, quantity_in_stock, last_restock) 
+				VALUES (?, 0, ?)
+				ON DUPLICATE KEY UPDATE 
+				    quantity_in_stock = quantity_in_stock + ?,
+				    last_restock = CASE WHEN ? = 1 THEN CURDATE() ELSE last_restock END
 				""";
+
 		try (PreparedStatement psInv = con.prepareStatement(sqlInventory)) {
 			int changeEffect = (typeId == 1) ? qtyChanged : -qtyChanged;
 
+			java.sql.Date initialRestockDate = (typeId == 1) ? new java.sql.Date(System.currentTimeMillis()) : null;
+
 			psInv.setInt(1, productId);
-			psInv.setInt(2, changeEffect);
+			psInv.setDate(2, initialRestockDate);
+			psInv.setInt(3, changeEffect);
+			psInv.setInt(4, typeId);
+
 			psInv.executeUpdate();
 		}
 	}

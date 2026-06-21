@@ -41,7 +41,7 @@ public class SignupInterface {
 		createLayout();
 		createActions();
 
-		scene = new Scene(root, 400, 420); // زدنا الحجم تكّة عشان يستوعب التقسيمة الجديدة براحة
+		scene = new Scene(root, 400, 420);
 		stage.setScene(scene);
 		stage.show();
 	}
@@ -132,7 +132,6 @@ public class SignupInterface {
 			return;
 		}
 
-		// @tech.com
 		if (email.toLowerCase().endsWith("@tech.com")) {
 			showAlert(Alert.AlertType.ERROR, "Access Denied", null,
 					"Security Violation! Regular users cannot register using the corporate admin domain.");

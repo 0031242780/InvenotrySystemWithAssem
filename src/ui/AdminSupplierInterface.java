@@ -1,5 +1,6 @@
 package ui;
 
+import dao.ProductDAO;
 import dao.SupplierDAO;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -8,13 +9,18 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
+import model.Product;
 import model.Supplier;
+import java.util.ArrayList;
 
 public class AdminSupplierInterface extends BorderPane {
 
 	private TableView<Supplier> table;
 
-	private TableColumn<Supplier, Integer> idCol;
+	// Added Side-Car Table View for Many-to-Many products & wholesale cost mapping
+	private TableView<Product> supplierProductsTable;
+	private ProductDAO productDAO = new ProductDAO();
+
 	private TableColumn<Supplier, String> companyCol;
 	private TableColumn<Supplier, String> contactCol;
 	private TableColumn<Supplier, String> emailCol;
@@ -33,44 +39,33 @@ public class AdminSupplierInterface extends BorderPane {
 	private Button clearBtn;
 
 	private GridPane form;
-
 	private HBox buttons;
-
 	private SupplierDAO dao;
 
 	private ObservableList<Supplier> suppliers = FXCollections.observableArrayList();
 
 	public AdminSupplierInterface() {
-
 		dao = new SupplierDAO();
 
-		// إضافة حواف داخلية مريحة حول الشاشة بأكملها لتناسق المظهر
 		setPadding(new Insets(20));
 
 		createFields();
-
 		createButtons();
-
 		createTable();
+		createSupplierProductsTable();
 
 		createForm();
-
 		loadSuppliers();
 	}
 
 	private void createFields() {
-
 		companyField = new TextField();
-
 		contactField = new TextField();
-
 		emailField = new TextField();
-
 		activeBox = new CheckBox("Active Status");
 	}
 
 	private void createButtons() {
-
 		addBtn = new Button("Add");
 		updateBtn = new Button("Update");
 		deleteBtn = new Button("Delete");
@@ -91,14 +86,8 @@ public class AdminSupplierInterface extends BorderPane {
 	}
 
 	private void createTable() {
-
 		table = new TableView<>();
-
-		// استخدام السياسة الحرة لمنع حدوث مشاكل في شريط التمرير أو ظهور عمود رمادي زائد
 		table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-
-		idCol = new TableColumn<>("ID");
-		idCol.setCellValueFactory(new PropertyValueFactory<>("supplierId"));
 
 		companyCol = new TableColumn<>("Company");
 		companyCol.setCellValueFactory(new PropertyValueFactory<>("companyName"));
@@ -112,7 +101,6 @@ public class AdminSupplierInterface extends BorderPane {
 		activeCol = new TableColumn<>("Status");
 		activeCol.setCellValueFactory(new PropertyValueFactory<>("active"));
 
-		// 🔥 تلوين وتنسيق حالة المورد بشكل فخم (أخضر للنشط وأحمر للمتوقف)
 		activeCol.setCellFactory(column -> new TableCell<Supplier, Boolean>() {
 			@Override
 			protected void updateItem(Boolean item, boolean empty) {
@@ -130,27 +118,60 @@ public class AdminSupplierInterface extends BorderPane {
 			}
 		});
 
-		// 🔥 توزيع المساحات هندسياً بالتساوي (المجموع 100%) مع خصم الـ 2 بكسل السحرية
-		// لإحكام الأبعاد
-		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10)); // 10%
-		companyCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25)); // 25%
-		contactCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25)); // 25%
-		emailCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25)); // 25%
-		activeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15)); // 15%
+		companyCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25));
+		contactCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25));
+		emailCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25));
+		activeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
 
-		table.getColumns().addAll(idCol, companyCol, contactCol, emailCol, activeCol);
-
+		table.getColumns().addAll(companyCol, contactCol, emailCol, activeCol);
 		table.setItems(suppliers);
 
+
 		table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
-			if (newValue != null)
+			if (newValue != null) {
 				fillFields(newValue);
+				loadSubTableProducts(newValue.getSupplierId());
+			} else {
+				supplierProductsTable.getItems().clear();
+			}
 		});
 	}
 
-	private void createForm() {
+	private void createSupplierProductsTable() {
+		supplierProductsTable = new TableView<>();
+		supplierProductsTable.setPlaceholder(new Label("Select a supplier from above to view their provided products and costs."));
+		supplierProductsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+		supplierProductsTable.setPrefHeight(250);
 
-		// 1. 🔥 إضافة العنوان العلوي للشاشة وتنسيقه بلون النظام الموحد
+		TableColumn<Product, String> pNameCol = new TableColumn<>("Supplied Product Name");
+		pNameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
+
+		TableColumn<Product, String> pCatCol = new TableColumn<>("Category");
+		pCatCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
+
+		TableColumn<Product, String> pBarcodeCol = new TableColumn<>("Barcode");
+		pBarcodeCol.setCellValueFactory(new PropertyValueFactory<>("barcode"));
+
+		TableColumn<Product, Double> pCostCol = new TableColumn<>("Cost ($)");
+		pCostCol.setCellValueFactory(new PropertyValueFactory<>("cost"));
+		pCostCol.setCellFactory(column -> new TableCell<Product, Double>() {
+			@Override
+			protected void updateItem(Double item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null) {
+					setText(null);
+					setStyle("");
+				} else {
+					setText(String.format("$%.2f", item));
+					setStyle("-fx-text-fill: #e67e22; -fx-font-weight: bold;"); // Clean Amber indicator styling
+				}
+			}
+		});
+
+		supplierProductsTable.getColumns().addAll(pNameCol, pCatCol, pBarcodeCol, pCostCol);
+	}
+
+	private void createForm() {
 		Label mainTitle = new Label("Suppliers Management");
 		mainTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
@@ -168,20 +189,44 @@ public class AdminSupplierInterface extends BorderPane {
 		form.add(new Label("Email"), 0, 2);
 		form.add(emailField, 1, 2);
 
-		form.add(activeBox, 1, 3); // تعديل السطر ليكون متناسقاً فورياً
+		form.add(activeBox, 1, 3);
 
 		buttons = new HBox(10);
 		buttons.getChildren().addAll(addBtn, updateBtn, deleteBtn, refreshBtn, clearBtn);
-		buttons.setAlignment(Pos.CENTER_LEFT); // محاذاة لليسار لراحة بصرية أفضل
+		buttons.setAlignment(Pos.CENTER_LEFT);
 
 		form.add(buttons, 1, 4);
 
-		// 2. 🔥 تجميع العنوان مع الفورم في حاوية VBox وتثبيتها في أعلى الـ BorderPane
 		VBox topContainer = new VBox(5);
 		topContainer.getChildren().addAll(mainTitle, form);
 
+		VBox centerLayout = new VBox(15);
+		centerLayout.setPadding(new Insets(10, 0, 0, 0));
+
+		Label subTitle = new Label("Products by Selected Supplier");
+		subTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
+
+		centerLayout.getChildren().addAll(
+				table,
+				subTitle,
+				supplierProductsTable
+		);
+
+		VBox.setVgrow(table, Priority.ALWAYS);
+		VBox.setVgrow(supplierProductsTable, Priority.ALWAYS);
+
 		setTop(topContainer);
-		setCenter(table);
+		setCenter(centerLayout);
+	}
+
+	private void loadSubTableProducts(int supplierId) {
+		try {
+			ArrayList<Product> items = productDAO.getProductsBySupplierId(supplierId);
+			supplierProductsTable.setItems(FXCollections.observableArrayList(items));
+		} catch (Exception e) {
+			e.printStackTrace();
+			showAlert(Alert.AlertType.ERROR, "Data Error", "Failed to retrieve vendor items", e.getMessage());
+		}
 	}
 
 	private void addSupplier() {
@@ -235,7 +280,6 @@ public class AdminSupplierInterface extends BorderPane {
 			clearFields();
 			showAlert(Alert.AlertType.INFORMATION, "Success", null, "Supplier Deleted Successfully!");
 		} catch (Exception e) {
-			// 🔥 فحص ذكي لقيود العلاقات لمنع كراش الداتابيز وعرض تنبيه فخم
 			if (e.getMessage() != null && (e.getMessage().contains("foreign key") || e.getMessage().contains("1451"))) {
 				showAlert(Alert.AlertType.ERROR, "Integrity Constraint Error", null,
 						"Cannot delete this supplier because they are linked to existing products or stock logs in the system!\n\n"
@@ -252,6 +296,7 @@ public class AdminSupplierInterface extends BorderPane {
 			suppliers.clear();
 			suppliers.addAll(dao.getAll());
 			table.refresh();
+			supplierProductsTable.getItems().clear();
 		} catch (Exception e) {
 			showAlert(Alert.AlertType.ERROR, "Error", null, e.getMessage());
 		}
@@ -270,6 +315,7 @@ public class AdminSupplierInterface extends BorderPane {
 		emailField.clear();
 		activeBox.setSelected(false);
 		table.getSelectionModel().clearSelection();
+		supplierProductsTable.getItems().clear();
 	}
 
 	private void showAlert(Alert.AlertType type, String title, String header, String content) {
@@ -277,11 +323,7 @@ public class AdminSupplierInterface extends BorderPane {
 		alert.setTitle(title);
 		alert.setHeaderText(header);
 		alert.setContentText(content);
-
-		// 🔥 السطر السحري: بخلي حجم البوكس يتلائم تلقائياً مع حجم النص بدون أي زيادة أو
-		// نقصان
 		alert.getDialogPane().setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
-
 		alert.showAndWait();
 	}
 }

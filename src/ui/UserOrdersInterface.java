@@ -19,14 +19,14 @@ public class UserOrdersInterface extends BorderPane {
 	private Account account;
 
 	private TableView<Order> table;
-	private TableView<OrderItem> detailsTable; // جدول تفاصيل القطع الجديد
+	private TableView<OrderItem> detailsTable;
 
 	private TableColumn<Order, Integer> idCol;
 	private TableColumn<Order, Double> totalCol;
 	private TableColumn<Order, String> statusCol;
 
 	private OrderDAO dao;
-	private OrderItemDAO orderItemDAO; // تعريف الـ DAO لحل المشكلة الثانية
+	private OrderItemDAO orderItemDAO;
 
 	private ObservableList<Order> orders = FXCollections.observableArrayList();
 
@@ -37,7 +37,7 @@ public class UserOrdersInterface extends BorderPane {
 		this.account = account;
 
 		dao = new OrderDAO();
-		orderItemDAO = new OrderItemDAO(); // تهيئة الكائن هنا
+		orderItemDAO = new OrderItemDAO();
 
 		createTable();
 
@@ -57,8 +57,8 @@ public class UserOrdersInterface extends BorderPane {
 		totalCol = new TableColumn<>("Total Price");
 		totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
 
-		statusCol = new TableColumn<>("Status ID");
-		statusCol.setCellValueFactory(new PropertyValueFactory<>("statusId"));
+		statusCol = new TableColumn<>("Status Name");
+		statusCol.setCellValueFactory(new PropertyValueFactory<>("statusName"));
 
 		table.getColumns().addAll(idCol, totalCol, statusCol);
 
@@ -66,13 +66,11 @@ public class UserOrdersInterface extends BorderPane {
 
 		table.setItems(orders);
 
-		table.setPrefHeight(300); // تصغير الارتفاع لتكفي الشاشة للجدولين
+		table.setPrefHeight(300);
 
-		// كود المراقبة: لما الزبون يضغط على سطر بالجدول، يعبي الجدول التحتاني تلقائياً
 		table.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
 			if (newVal != null) {
 				try {
-					// استدعاء دالة جلب القطع بناءً على رقم الطلب
 					ArrayList<OrderItem> items = orderItemDAO.getItemsByOrder(newVal.getOrderId());
 					detailsTable.setItems(FXCollections.observableArrayList(items));
 				} catch (Exception ex) {
@@ -88,7 +86,6 @@ public class UserOrdersInterface extends BorderPane {
 		container = new VBox(10);
 		container.setPadding(new Insets(10));
 
-		// إنشاء وتجهيز أعمدة جدول التفاصيل السفلي
 		detailsTable = new TableView<>();
 
 		TableColumn<OrderItem, Integer> pIdCol = new TableColumn<>("Product ID");
@@ -104,7 +101,6 @@ public class UserOrdersInterface extends BorderPane {
 		detailsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 		detailsTable.setPrefHeight(250);
 
-		// إضافة العناوين والجدولين داخل الواجهة
 		container.getChildren().addAll(new Label("My Orders:"), table, new Label("Order Details (Items Included):"),
 				detailsTable);
 
