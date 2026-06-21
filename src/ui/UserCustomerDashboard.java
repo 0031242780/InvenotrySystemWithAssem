@@ -58,7 +58,6 @@ public class UserCustomerDashboard extends BorderPane {
 
 		home.setOnAction(e -> showDashboard());
 
-		// 🔥 تم الحل هنا: مررنا الـ refreshTask للشاشات عشان يروح الإيرور
 		products.setOnAction(e -> setCenter(new UserProductInterface(account, refreshTask)));
 		categories.setOnAction(e -> setCenter(new UserCategoryInterface(account)));
 		cart.setOnAction(e -> setCenter(new UserShoppingCartInterface(account, refreshTask)));

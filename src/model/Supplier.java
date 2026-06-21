@@ -1,16 +1,27 @@
 package model;
 
-public class Supplier {
+import java.util.ArrayList;
 
+public class Supplier {
 	private int supplierId;
 	private String companyName;
 	private String contactPerson;
 	private String email;
-	private boolean active;
+	private boolean isActive;
 
-	public Supplier() {
+	// This stores your multi-valued phone numbers
+	private ArrayList<String> phoneNumbers = new ArrayList<>();
+
+	// --- Getter and Setter for Phone Numbers ---
+	public ArrayList<String> getPhoneNumbers() {
+		return phoneNumbers;
 	}
 
+	public void setPhoneNumbers(ArrayList<String> phoneNumbers) {
+		this.phoneNumbers = phoneNumbers;
+	}
+
+	// --- Standard Getters and Setters for the rest ---
 	public int getSupplierId() {
 		return supplierId;
 	}
@@ -44,16 +55,10 @@ public class Supplier {
 	}
 
 	public boolean isActive() {
-		return active;
+		return isActive;
 	}
 
-	public void setActive(boolean active) {
-		this.active = active;
+	public void setActive(boolean isActive) {
+		this.isActive = isActive;
 	}
-
-	@Override
-	public String toString() {
-		return this.companyName;
-	}
-
 }

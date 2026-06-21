@@ -22,7 +22,6 @@ public class CartDAO {
 
 		}
 
-		// اذا ما في session اعمل وحدة
 
 		String insert = "INSERT INTO shopping_session(create_at,updated_at,account_id) VALUES(NOW(),NOW(),?)";
 
@@ -75,8 +74,6 @@ public class CartDAO {
 
 		ArrayList<CartItem> list = new ArrayList<>();
 
-		// استعلام ذكي: بيفحص لو في سعر مخفض فعال (بين تاريخ البداية والنهاية) بياخده،
-		// وإلا بياخد السعر الأصلي
 		String sql = """
 				SELECT ci.*, p.product_name,
 				       IFNULL(
@@ -103,7 +100,6 @@ public class CartDAO {
 				c.setQuantity(rs.getInt("quantity"));
 				c.setProductName(rs.getString("product_name"));
 
-				// هان بناخد السعر النهائي المصلح (سواء كان الأصلي أو المخصوم) وبنضربه بالكمية
 				double finalPrice = rs.getDouble("final_price");
 				int qty = rs.getInt("quantity");
 				c.setPrice(finalPrice * qty);

@@ -8,7 +8,6 @@ import model.StockMovement;
 
 public class StockMovementDAO {
 
-	// 📊 1. دالة جلب السجل الكامل بالأسماء والتاريخ المصلحة هندسياً
 	public ArrayList<StockMovement> getAllMovementsWithNames() throws Exception {
 		ArrayList<StockMovement> list = new ArrayList<>();
 		String sql = """
@@ -30,12 +29,8 @@ public class StockMovementDAO {
 				sm.setAccountId(rs.getInt("account_id"));
 				sm.setNotes(rs.getString("notes"));
 
-				// تعبئة الأسماء المستخرجة من الـ JOIN
 				sm.setProductName(rs.getString("product_name"));
 				sm.setTypeName(rs.getString("type_name"));
-
-				// 🔥 التعديل الصح هان: نقرأ العمود كـ Timestamp متوافق بالملّي مع كلاس الموديل
-				// عندك
 				sm.setCreatedAt(rs.getTimestamp("create_at"));
 
 				list.add(sm);
@@ -44,11 +39,8 @@ public class StockMovementDAO {
 		return list;
 	}
 
-	// 🔥 2. الدالة المركزية الأوتوماتيكية: تسجل الحركة بالجدول وتعدل كمية الـ
-	// inventory فوراً!
 	public static void logMovementAndUpdateStock(int productId, int qtyChanged, int typeId, String notes, int accountId,
-			Connection con) throws Exception {
-		// أ. إدخال السطر في جدول حركات المستودع تلقائياً
+	                                             Connection con) throws Exception {
 		String sqlMovement = "INSERT INTO stock_movement (quantity_changed, notes, create_at, type_id, account_id, product_id) VALUES (?, ?, NOW(), ?, ?, ?)";
 		try (PreparedStatement psMove = con.prepareStatement(sqlMovement)) {
 			psMove.setInt(1, qtyChanged);
@@ -59,18 +51,15 @@ public class StockMovementDAO {
 			psMove.executeUpdate();
 		}
 
-		// ب. تحديث جدول الـ inventory الفعلي بحساب الكميات (إضافة لو نوع 1، وطرح لو أي
-		// نوع تاني)
 		String sqlInventory = """
-				INSERT INTO inventory (product_id, quantity_in_stock) VALUES (?, ?)
+				INSERT INTO inventory (product_id, quantity_in_stock) VALUES (?, 0)
 				ON DUPLICATE KEY UPDATE quantity_in_stock = quantity_in_stock + ?
 				""";
 		try (PreparedStatement psInv = con.prepareStatement(sqlInventory)) {
-			int changeEffect = (typeId == 1) ? qtyChanged : -qtyChanged; // إذا دخول بضاعة يزيد، لو تالف أو مبيعات ينقص
+			int changeEffect = (typeId == 1) ? qtyChanged : -qtyChanged;
 
 			psInv.setInt(1, productId);
-			psInv.setInt(2, qtyChanged); // لو أول مرة ينزل المنتج بتنزل الكمية الممررة كبداية
-			psInv.setInt(3, changeEffect); // لو المنتج موجود مسبقاً، بجمع التأثير الرياضي للكمية (+ أو -)
+			psInv.setInt(2, changeEffect);
 			psInv.executeUpdate();
 		}
 	}

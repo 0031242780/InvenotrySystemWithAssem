@@ -18,7 +18,7 @@ public class UserShoppingCartInterface extends BorderPane {
 	private Account account;
 	private TableView<CartItem> table;
 	private Button checkoutBtn;
-	private Runnable onOrderPlaced; // Callback لتحديث لوحة التحكم بعد الشراء
+	private Runnable onOrderPlaced;
 
 	public UserShoppingCartInterface(Account account, Runnable onOrderPlaced) {
 		this.account = account;
@@ -83,15 +83,14 @@ public class UserShoppingCartInterface extends BorderPane {
 				return;
 			}
 
-			// 1. احسب المجموع الإجمالي للطلب كامل أولاً
+
 			double totalOrderPrice = 0.0;
 			for (CartItem c : items) {
-				totalOrderPrice += c.getQuantity() * c.getPrice(); // الكمية × السعر
+				totalOrderPrice += c.getQuantity() * c.getPrice();
 			}
 
-			// 2. تم الإصلاح: مرر المجموع الحقيقي المحسوب (totalOrderPrice) بدلاً من الصفر
-			// الثابت
-			int orderId = orderDAO.createOrder(totalOrderPrice, account.getAccountId());
+
+			int orderId = orderDAO.createOrder(totalOrderPrice , account.getAccountId());
 
 			for (CartItem c : items) {
 				OrderItem item = new OrderItem();
@@ -99,18 +98,15 @@ public class UserShoppingCartInterface extends BorderPane {
 				item.setProductId(c.getProductId());
 				item.setQuantity(c.getQuantity());
 
-				// إرسال السعر الفعلي للمنتج عند الشراء
 				item.setPriceAtPurchase(c.getPrice());
 
 				itemDAO.insert(item);
 			}
 
-			// تفريغ عربة التسوق بعد الشراء بنجاح
 			cartDAO.clearCart(session);
 
 			new Alert(Alert.AlertType.INFORMATION, "Order Created Successfully!").showAndWait();
 
-			// تشغيل التحديث التلقائي فوراً لتنعكس التغييرات في الواجهة الرئيسية للزبون
 			if (onOrderPlaced != null) {
 				onOrderPlaced.run();
 			}
