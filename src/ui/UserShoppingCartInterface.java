@@ -1,9 +1,12 @@
 package ui;
 
+import java.sql.Connection;
 import java.util.ArrayList;
 import dao.CartDAO;
+import dao.DBConnection;
 import dao.OrderDAO;
 import dao.OrderItemDAO;
+import dao.StockMovementDAO;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
@@ -70,11 +73,11 @@ public class UserShoppingCartInterface extends BorderPane {
 	}
 
 	private void checkout() {
-		try {
-			CartDAO cartDAO = new CartDAO();
-			OrderDAO orderDAO = new OrderDAO();
-			OrderItemDAO itemDAO = new OrderItemDAO();
+		CartDAO cartDAO = new CartDAO();
+		OrderDAO orderDAO = new OrderDAO();
+		OrderItemDAO itemDAO = new OrderItemDAO();
 
+		try {
 			int session = cartDAO.getSession(account.getAccountId());
 			ArrayList<CartItem> items = cartDAO.getCart(session);
 
@@ -83,27 +86,45 @@ public class UserShoppingCartInterface extends BorderPane {
 				return;
 			}
 
+			try (Connection con = DBConnection.getConnection()) {
+				con.setAutoCommit(false);
+				try {
+					int initialStatusId = 1;
+					int orderId = orderDAO.createOrder(initialStatusId, account.getAccountId());
 
-			double totalOrderPrice = 0.0;
-			for (CartItem c : items) {
-				totalOrderPrice += c.getQuantity() * c.getPrice();
+					if (orderId == -1) {
+						throw new Exception("Failed to generate order reference ID.");
+					}
+
+					for (CartItem c : items) {
+						OrderItem item = new OrderItem();
+						item.setOrderId(orderId);
+						item.setProductId(c.getProductId());
+						item.setQuantity(c.getQuantity());
+						item.setPriceAtPurchase(c.getPrice());
+
+						itemDAO.insert(item);
+
+						int deductionType = 2;
+						StockMovementDAO.logMovementAndUpdateStock(
+								c.getProductId(),
+								c.getQuantity(),
+								deductionType,
+								"Stock deducted automatically for Order #" + orderId,
+								account.getAccountId(),
+								con
+						);
+					}
+
+					cartDAO.clearCart(session);
+
+					con.commit();
+
+				} catch (Exception ex) {
+					con.rollback();
+					throw ex;
+				}
 			}
-
-
-			int orderId = orderDAO.createOrder(totalOrderPrice , account.getAccountId());
-
-			for (CartItem c : items) {
-				OrderItem item = new OrderItem();
-				item.setOrderId(orderId);
-				item.setProductId(c.getProductId());
-				item.setQuantity(c.getQuantity());
-
-				item.setPriceAtPurchase(c.getPrice());
-
-				itemDAO.insert(item);
-			}
-
-			cartDAO.clearCart(session);
 
 			new Alert(Alert.AlertType.INFORMATION, "Order Created Successfully!").showAndWait();
 

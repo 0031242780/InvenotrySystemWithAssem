@@ -3,7 +3,6 @@ package ui;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.ArrayList;
 
 import dao.DBConnection;
 import dao.ProductDAO;
@@ -19,7 +18,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import model.Product;
 import model.Category;
-import model.Supplier;
 
 public class AdminProductInterface extends VBox {
 
@@ -29,7 +27,6 @@ public class AdminProductInterface extends VBox {
 	private TableColumn<Product, String> barcodeCol;
 	private TableColumn<Product, String> descCol;
 	private TableColumn<Product, String> catCol;
-	private TableColumn<Product, String> supCol;
 
 	private TableColumn<Product, Double> costCol;
 	private TableColumn<Product, Double> priceCol;
@@ -43,7 +40,6 @@ public class AdminProductInterface extends VBox {
 	private TextField costField;
 
 	private ComboBox<Category> categoryComboBox;
-	private ComboBox<Supplier> supplierComboBox;
 
 	private TextField discountPercentField;
 	private Button applyDiscountBtn;
@@ -57,7 +53,6 @@ public class AdminProductInterface extends VBox {
 	private ObservableList<Product> productsList = FXCollections.observableArrayList();
 
 	public AdminProductInterface() {
-
 		productDAO = new ProductDAO();
 
 		setSpacing(15);
@@ -88,15 +83,9 @@ public class AdminProductInterface extends VBox {
 		categoryComboBox.setPrefWidth(150);
 		form.add(categoryComboBox, 3, 0);
 
-		form.add(new Label("Supplier:"), 2, 1);
-		supplierComboBox = new ComboBox<>();
-		supplierComboBox.setPromptText("Select Supplier");
-		supplierComboBox.setPrefWidth(150);
-		form.add(supplierComboBox, 3, 1);
-
-		form.add(new Label("Price ($):"), 2, 2);
+		form.add(new Label("Price ($):"), 2, 1);
 		priceField = new TextField();
-		form.add(priceField, 3, 2);
+		form.add(priceField, 3, 1);
 
 		form.add(new Label("Cost ($):"), 0, 3);
 		costField = new TextField();
@@ -126,7 +115,6 @@ public class AdminProductInterface extends VBox {
 
 		loadData();
 		loadCategoriesToCombo();
-		loadSuppliersToCombo();
 	}
 
 	private void createTable() {
@@ -148,36 +136,35 @@ public class AdminProductInterface extends VBox {
 		catCol = new TableColumn<>("Category");
 		catCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
 
-		supCol = new TableColumn<>("Supplier");
-		supCol.setCellValueFactory(new PropertyValueFactory<>("supplierName"));
-
 		costCol = new TableColumn<>("Cost ($)");
 		costCol.setCellValueFactory(new PropertyValueFactory<>("cost"));
 
 		priceCol = new TableColumn<>("Reg. Price ($)");
 		priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
 
-		discountCol = new TableColumn<>("Disc. Price ($)");
+		discountCol = new TableColumn<>("Final Price ($)");
 		discountCol.setCellValueFactory(new PropertyValueFactory<>("discountPrice"));
 
-		// 🔥 تلوين السعر بعد الخصم باللون الأخضر هنا
 		discountCol.setCellFactory(column -> new TableCell<Product, Double>() {
 			@Override
 			protected void updateItem(Double item, boolean empty) {
 				super.updateItem(item, empty);
-				if (empty || item == null) {
-					setText("-");
+				if (empty) {
+					setText(null);
 					setStyle("");
 					return;
 				}
 				Product p = (Product) getTableRow().getItem();
-				if (p == null || item <= 0) {
-					setText("-");
+				if (p == null) {
+					setText(null);
+					setStyle("");
+				} else if (item == null || item <= 0) {
+					setText(String.format("$%.2f", p.getPrice()));
 					setStyle("");
 				} else {
 					double finalPrice = p.getPrice() - item;
 					setText(String.format("$%.2f", finalPrice));
-					setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;"); // السعر الأخضر
+					setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;");
 				}
 			}
 		});
@@ -207,24 +194,22 @@ public class AdminProductInterface extends VBox {
 		});
 
 		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.04));
-		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
-		barcodeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
-		descCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
-		catCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
-		supCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
+		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.18));
+		barcodeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.12));
+		descCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.18));
+		catCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.12));
 		costCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
 		priceCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
-		discountCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
-		percentCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
+		discountCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
+		percentCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
 
-		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, supCol, costCol, priceCol, discountCol,
+		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, costCol, priceCol, discountCol,
 				percentCol);
 		table.setItems(productsList);
 		table.setPrefHeight(350);
 	}
 
 	private void setupActions() {
-
 		table.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
 			if (newSelection != null) {
 				nameField.setText(newSelection.getProductName());
@@ -236,13 +221,6 @@ public class AdminProductInterface extends VBox {
 				for (Category c : categoryComboBox.getItems()) {
 					if (c.getCategoryId() == newSelection.getCategoryId()) {
 						categoryComboBox.setValue(c);
-						break;
-					}
-				}
-
-				for (Supplier s : supplierComboBox.getItems()) {
-					if (s.getSupplierId() == newSelection.getSupplierId()) {
-						supplierComboBox.setValue(s);
 						break;
 					}
 				}
@@ -261,10 +239,9 @@ public class AdminProductInterface extends VBox {
 		addBtn.setOnAction(e -> {
 			try {
 				Category selectedCat = categoryComboBox.getValue();
-				Supplier selectedSup = supplierComboBox.getValue();
 
-				if (selectedCat == null || selectedSup == null) {
-					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category and Supplier from lists!");
+				if (selectedCat == null) {
+					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category from the list!");
 					return;
 				}
 
@@ -273,7 +250,6 @@ public class AdminProductInterface extends VBox {
 				p.setBarcode(barcodeField.getText());
 				p.setDescription(descField.getText());
 				p.setCategoryId(selectedCat.getCategoryId());
-				p.setSupplierId(selectedSup.getSupplierId());
 				p.setPrice(Double.parseDouble(priceField.getText()));
 				p.setCost(Double.parseDouble(costField.getText()));
 
@@ -294,10 +270,9 @@ public class AdminProductInterface extends VBox {
 			}
 			try {
 				Category selectedCat = categoryComboBox.getValue();
-				Supplier selectedSup = supplierComboBox.getValue();
 
-				if (selectedCat == null || selectedSup == null) {
-					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category and Supplier from lists!");
+				if (selectedCat == null) {
+					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category from the list!");
 					return;
 				}
 
@@ -305,23 +280,28 @@ public class AdminProductInterface extends VBox {
 				selected.setBarcode(barcodeField.getText());
 				selected.setDescription(descField.getText());
 				selected.setCategoryId(selectedCat.getCategoryId());
-				selected.setSupplierId(selectedSup.getSupplierId());
 
 				double price = Double.parseDouble(priceField.getText());
 				selected.setPrice(price);
 				selected.setCost(Double.parseDouble(costField.getText()));
+
+				productDAO.updateProduct(selected);
 
 				String percentText = discountPercentField.getText().trim();
 				if (!percentText.isEmpty()) {
 					double percent = Double.parseDouble(percentText);
 					double discAmount = price * (percent / 100.0);
 					selected.setDiscountPrice(discAmount);
+
+					java.sql.Timestamp startDate = new java.sql.Timestamp(System.currentTimeMillis());
+					java.sql.Timestamp endDate = new java.sql.Timestamp(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
+
+					productDAO.addDiscount(selected.getProductId(), startDate, endDate, discAmount);
 				} else {
 					selected.setDiscountPrice(0.0);
+					java.sql.Timestamp now = new java.sql.Timestamp(System.currentTimeMillis());
+					productDAO.addDiscount(selected.getProductId(), now, now, 0.0);
 				}
-
-				productDAO.updateProduct(selected);
-				productDAO.addDiscount(selected.getProductId(), selected.getDiscountPrice());
 
 				showAlert(Alert.AlertType.INFORMATION, "Success", "Product updated successfully!");
 				loadData();
@@ -358,7 +338,6 @@ public class AdminProductInterface extends VBox {
 		refreshBtn.setOnAction(e -> {
 			loadData();
 			loadCategoriesToCombo();
-			loadSuppliersToCombo();
 		});
 
 		applyDiscountBtn.setOnAction(e -> {
@@ -374,6 +353,9 @@ public class AdminProductInterface extends VBox {
 				double calculatedDiscountAmount = 0;
 				String message = "";
 
+				java.sql.Timestamp startDate = new java.sql.Timestamp(System.currentTimeMillis());
+				java.sql.Timestamp endDate;
+
 				if (!percentText.isEmpty()) {
 					double percent = Double.parseDouble(percentText);
 
@@ -384,14 +366,19 @@ public class AdminProductInterface extends VBox {
 
 					calculatedDiscountAmount = selectedProduct.getPrice() * (percent / 100.0);
 					double finalPrice = selectedProduct.getPrice() - calculatedDiscountAmount;
+
+					endDate = new java.sql.Timestamp(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000));
+
 					message = percent + "% Discount applied successfully! New Price: $"
-							+ String.format("%.2f", finalPrice);
+							+ String.format("%.2f", finalPrice) + "\nActive until: " + endDate;
 				} else {
 					calculatedDiscountAmount = 0;
+					endDate = startDate;
 					message = "Discount removed successfully! Product returned to original price.";
 				}
 
-				productDAO.addDiscount(selectedProduct.getProductId(), calculatedDiscountAmount);
+
+				productDAO.addDiscount(selectedProduct.getProductId(), startDate, endDate, calculatedDiscountAmount);
 
 				showAlert(Alert.AlertType.INFORMATION, "Success", message);
 				loadData();
@@ -422,24 +409,6 @@ public class AdminProductInterface extends VBox {
 		}
 	}
 
-	private void loadSuppliersToCombo() {
-		ObservableList<Supplier> options = FXCollections.observableArrayList();
-		String sql = "SELECT supplier_id, company_name FROM supplier WHERE is_active = true";
-		try (Connection con = DBConnection.getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				ResultSet rs = ps.executeQuery()) {
-			while (rs.next()) {
-				Supplier s = new Supplier();
-				s.setSupplierId(rs.getInt("supplier_id"));
-				s.setCompanyName(rs.getString("company_name"));
-				options.add(s);
-			}
-			supplierComboBox.setItems(options);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
 	private void loadData() {
 		try {
 			productsList.clear();
@@ -457,7 +426,6 @@ public class AdminProductInterface extends VBox {
 		priceField.clear();
 		costField.clear();
 		categoryComboBox.setValue(null);
-		supplierComboBox.setValue(null);
 		discountPercentField.clear();
 		table.getSelectionModel().clearSelection();
 	}

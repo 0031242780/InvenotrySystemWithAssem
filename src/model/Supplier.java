@@ -9,10 +9,8 @@ public class Supplier {
 	private String email;
 	private boolean isActive;
 
-	// This stores your multi-valued phone numbers
 	private ArrayList<String> phoneNumbers = new ArrayList<>();
 
-	// --- Getter and Setter for Phone Numbers ---
 	public ArrayList<String> getPhoneNumbers() {
 		return phoneNumbers;
 	}
@@ -21,7 +19,6 @@ public class Supplier {
 		this.phoneNumbers = phoneNumbers;
 	}
 
-	// --- Standard Getters and Setters for the rest ---
 	public int getSupplierId() {
 		return supplierId;
 	}
@@ -61,4 +58,5 @@ public class Supplier {
 	public void setActive(boolean isActive) {
 		this.isActive = isActive;
 	}
+
 }
