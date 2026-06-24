@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 
 import dao.DBConnection;
+import dao.DiscountDAO;
 import dao.ProductDAO;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -50,6 +51,8 @@ public class AdminProductInterface extends VBox {
 	private Button resupplyBtn;
 
 	private ProductDAO productDAO;
+	private TextField discountField;
+	private Button discountBtn;
 	private ObservableList<Product> productsList = FXCollections.observableArrayList();
 
 	public AdminProductInterface() {
@@ -97,9 +100,14 @@ public class AdminProductInterface extends VBox {
 		resupplyField.setPromptText("Qty (e.g. 50)");
 		resupplyField.setPrefWidth(100);
 		resupplyBtn = new Button("Resupply");
+		discountField = new TextField();
+		discountField.setPromptText("Discount Price");
+		discountField.setPrefWidth(100);
 
-		bottomBox.getChildren().addAll(addBtn, editBtn, deleteBtn, refreshBtn, resupplyField, resupplyBtn);
+		discountBtn = new Button("Add Discount");
 
+		bottomBox.getChildren().addAll(addBtn, editBtn, deleteBtn, refreshBtn, resupplyField, resupplyBtn,
+				discountField, discountBtn);
 		getChildren().addAll(mainTitle, form, table, bottomBox);
 		VBox.setVgrow(table, Priority.ALWAYS);
 
@@ -236,7 +244,8 @@ public class AdminProductInterface extends VBox {
 		discountCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
 		percentCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.06));
 
-		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, quantityCol, costCol, priceCol, discountCol, percentCol);
+		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, quantityCol, costCol, priceCol,
+				discountCol, percentCol);
 		table.setItems(productsList);
 		table.setPrefHeight(350);
 	}
@@ -247,7 +256,7 @@ public class AdminProductInterface extends VBox {
 				nameField.setText(newSelection.getProductName());
 				barcodeField.setText(newSelection.getBarcode());
 				descField.setText(newSelection.getDescription());
-
+				discountBtn.setOnAction(e -> handleDiscount());
 				for (Category c : categoryComboBox.getItems()) {
 					if (c.getCategoryId() == newSelection.getCategoryId()) {
 						categoryComboBox.setValue(c);
@@ -419,7 +428,8 @@ public class AdminProductInterface extends VBox {
 		}
 
 		if (selected.getCost() <= 0) {
-			showAlert(Alert.AlertType.WARNING, "Supply Line Restriction", "This product cannot be resupplied because it is not linked to an active supplier source. Please map this product to a supplier vendor first.");
+			showAlert(Alert.AlertType.WARNING, "Supply Line Restriction",
+					"This product cannot be resupplied because it is not linked to an active supplier source. Please map this product to a supplier vendor first.");
 			return;
 		}
 
@@ -441,13 +451,57 @@ public class AdminProductInterface extends VBox {
 			dao.PaymentDAO paymentDAO = new dao.PaymentDAO();
 			paymentDAO.insertWholesaleExpense(selected.getProductId(), selected.getCost(), addedQuantity);
 
-			showAlert(Alert.AlertType.INFORMATION, "Success", "Stock resupplied and wholesale payment ledger entry logged successfully!");
+			showAlert(Alert.AlertType.INFORMATION, "Success",
+					"Stock resupplied and wholesale payment ledger entry logged successfully!");
 			resupplyField.clear();
 			loadData();
 		} catch (NumberFormatException ex) {
 			showAlert(Alert.AlertType.ERROR, "Error", "Please enter a valid whole number for quantity.");
 		} catch (Exception ex) {
 			showExceptionAlert("Resupply Action Failed", ex);
+		}
+	}
+
+	private void handleDiscount() {
+
+		Product selected = table.getSelectionModel().getSelectedItem();
+
+		if (selected == null) {
+			showAlert(Alert.AlertType.WARNING, "Warning", "Please select a product first!");
+			return;
+		}
+
+		String value = discountField.getText().trim();
+
+		if (value.isEmpty()) {
+			showAlert(Alert.AlertType.WARNING, "Warning", "Enter discount price");
+			return;
+		}
+
+		try {
+
+			double discountPrice = Double.parseDouble(value);
+
+			if (discountPrice <= 0 || discountPrice >= selected.getPrice()) {
+				showAlert(Alert.AlertType.ERROR, "Error", "Discount price must be lower than regular price");
+				return;
+			}
+
+			DiscountDAO dao = new DiscountDAO();
+
+			dao.addDiscount(selected.getProductId(), discountPrice);
+
+			showAlert(Alert.AlertType.INFORMATION, "Success", "Discount added successfully!");
+
+			discountField.clear();
+			loadData();
+
+		} catch (NumberFormatException ex) {
+
+			showAlert(Alert.AlertType.ERROR, "Error", "Enter a valid number");
+
+		} catch (Exception ex) {
+			showExceptionAlert("Discount Failed", ex);
 		}
 	}
 }
