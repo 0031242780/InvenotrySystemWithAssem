@@ -22,11 +22,9 @@ public class AdminOrderInterface extends VBox {
 	private TableView<Order> orderTable;
 	private ObservableList<Order> ordersList = FXCollections.observableArrayList();
 
-	// 🔥 جدول تفاصيل عناصر الطلب السفلي المطور
 	private TableView<OrderDetail> detailsTable;
 	private ObservableList<OrderDetail> detailsList = FXCollections.observableArrayList();
 
-	// 🔥 عناصر التحكم السفلية الذكية (ComboBox بدل الـ TextField)
 	private ComboBox<String> statusComboBox;
 	private ComboBox<CompanyHelper> companyComboBox;
 
@@ -48,29 +46,24 @@ public class AdminOrderInterface extends VBox {
 		Label tableTitle = new Label("All System Orders List");
 		tableTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
-		// 1. بناء الجدول العلوي للطلبات
 		createOrderTable();
 
 		Label subTitle = new Label("Selected Order Included Items (Details)");
 		subTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
-		// 2. بناء الجدول السفلي لتفاصيل المنتجات
 		createDetailsTable();
 
-		// 3. بناء شريط التحكم السفلي المتناسق
 		HBox bottomBox = new HBox(12);
 		bottomBox.setAlignment(Pos.CENTER_LEFT);
 
 		refreshBtn = new Button("Refresh Data");
 
-		// 🔥 القائمة المنسدلة لحالات الطلب المضمونة هندسياً
 		statusComboBox = new ComboBox<>();
 		statusComboBox.setPromptText("Select Status");
 		statusComboBox.getItems().addAll("Pending", "Processing", "Shipped", "Completed", "Cancelled");
 
 		updateStatusBtn = new Button("Update Status");
 
-		// 🔥 القائمة المنسدلة لشركات التوصيل الحية من الداتابيز
 		companyComboBox = new ComboBox<>();
 		companyComboBox.setPromptText("Select Company");
 		companyComboBox.setPrefWidth(150);
@@ -79,12 +72,10 @@ public class AdminOrderInterface extends VBox {
 
 		bottomBox.getChildren().addAll(refreshBtn, statusComboBox, updateStatusBtn, companyComboBox, assignCompanyBtn);
 
-		// تجميع الشاشة كاملة مكملة عمودياً
 		getChildren().addAll(mainTitle, tableTitle, orderTable, subTitle, detailsTable, bottomBox);
 
 		setupActions();
 
-		// تحميل البيانات فوراً عند فتح الشاشة
 		loadOrders();
 		loadDeliveryCompanies();
 	}
@@ -100,19 +91,15 @@ public class AdminOrderInterface extends VBox {
 		TableColumn<Order, Double> totalCol = new TableColumn<>("Total Price ($)");
 		totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
 
-		// 🔥 تم قلبها لـ Status Name وتعرض كلمات صريحة
 		TableColumn<Order, String> statusCol = new TableColumn<>("Status Name");
 		statusCol.setCellValueFactory(new PropertyValueFactory<>("statusName"));
 
-		// 🔥 تم قلبها لـ Customer Name وتعرض اسم الزبون الكامل
 		TableColumn<Order, String> userCol = new TableColumn<>("Customer Name");
 		userCol.setCellValueFactory(new PropertyValueFactory<>("customerName"));
 
-		// اكتفينا باسم شركة التوصيل صراحةً وطيرنا الـ ID الرقمي المشوه
 		TableColumn<Order, String> compNameCol = new TableColumn<>("Company Name");
 		compNameCol.setCellValueFactory(new PropertyValueFactory<>("companyName"));
 
-		// تقسيم الأبعاد بالتساوي الهندي الفخم
 		idCol.prefWidthProperty().bind(orderTable.widthProperty().subtract(2).multiply(0.12));
 		totalCol.prefWidthProperty().bind(orderTable.widthProperty().subtract(2).multiply(0.18));
 		statusCol.prefWidthProperty().bind(orderTable.widthProperty().subtract(2).multiply(0.20));
@@ -128,7 +115,6 @@ public class AdminOrderInterface extends VBox {
 		detailsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 		detailsTable.setPrefHeight(180);
 
-		// 🔥 العمود السحري الجديد: يعرض اسم المنتج بالكلمات
 		TableColumn<OrderDetail, String> pNameCol = new TableColumn<>("Product Name");
 		pNameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
 
@@ -144,20 +130,17 @@ public class AdminOrderInterface extends VBox {
 
 	private void setupActions() {
 
-		// مراقب الجدول العلوي: عند الضغط على طلب، بروح يسحب عناصره بالأسماء فوراً
-		// للجدول التحتاني
+
 		orderTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
 			if (newSelection != null) {
 				loadOrderItems(newSelection.getOrderId());
 
-				// تحديد الحالة تلقائياً في الـ ComboBox بناءً على حالة الطلب المكبوس
 				statusComboBox.setValue(newSelection.getStatusName());
 			} else {
 				detailsList.clear();
 			}
 		});
 
-		// 🔄 أكشن كبسة التحديث
 		refreshBtn.setOnAction(e -> {
 			loadOrders();
 			loadDeliveryCompanies();
@@ -165,7 +148,6 @@ public class AdminOrderInterface extends VBox {
 			companyComboBox.setValue(null);
 		});
 
-		// ⚡ أكشن تحديث الحالة المطور (ترجمة النص لرقم أوتوماتيكياً)
 		updateStatusBtn.setOnAction(e -> {
 			Order selected = orderTable.getSelectionModel().getSelectedItem();
 			String selectedStatus = statusComboBox.getValue();
@@ -179,7 +161,6 @@ public class AdminOrderInterface extends VBox {
 				return;
 			}
 
-			// ترجمة النص الصافي إلى رقم الـ ID المقابل له بالداتابيز
 			int statusId = switch (selectedStatus) {
 			case "Pending" -> 1;
 			case "Processing" -> 2;
@@ -199,7 +180,6 @@ public class AdminOrderInterface extends VBox {
 			}
 		});
 
-		// 🚚 أكشن تعيين شركة التوصيل بالماوس
 		assignCompanyBtn.setOnAction(e -> {
 			Order selected = orderTable.getSelectionModel().getSelectedItem();
 			CompanyHelper selectedCompany = companyComboBox.getValue();
@@ -234,7 +214,6 @@ public class AdminOrderInterface extends VBox {
 		}
 	}
 
-	// 🔥 دالة سحب عناصر الفاتورة مع عمل JOIN ذكي لجلب أسماء المنتجات صراحةً
 	private void loadOrderItems(int orderId) {
 		detailsList.clear();
 		String sql = """
@@ -258,7 +237,6 @@ public class AdminOrderInterface extends VBox {
 		}
 	}
 
-	// دالة جلب شركات التوصيل الحية لتعبئة الـ ComboBox
 	private void loadDeliveryCompanies() {
 		ObservableList<CompanyHelper> options = FXCollections.observableArrayList();
 		String sql = "SELECT company_id, company_name FROM delivery_company WHERE is_active = true";
@@ -282,8 +260,7 @@ public class AdminOrderInterface extends VBox {
 		alert.showAndWait();
 	}
 
-	// 🔥 كائن داخلي (Inner Class) يمثل تفاصيل عناصر الفاتورة بالأسماء، عشان يشتغل
-	// معك فوراً وبأمان
+
 	public static class OrderDetail {
 		private int productId;
 		private String productName;
@@ -314,7 +291,6 @@ public class AdminOrderInterface extends VBox {
 		}
 	}
 
-	// كائن داخلي مساعد لربط اسم شركة التوصيل بـ الـ ID تبعها جوّا الـ ComboBox
 	public static class CompanyHelper {
 		private int companyId;
 		private String companyName;
@@ -335,6 +311,6 @@ public class AdminOrderInterface extends VBox {
 		@Override
 		public String toString() {
 			return companyName;
-		} // يجبر الجافا تعرض الاسم بالماوس للآدمن
+		}
 	}
 }

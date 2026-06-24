@@ -6,73 +6,75 @@ import model.Payment;
 
 public class PaymentDAO {
 
-    public void insert(Payment p) throws Exception {
-        String sql = """
-				INSERT INTO payment (order_id, payment_date, amount, payment_method, transaction_status)
-				VALUES (?, NOW(), ?, ?, ?)
-				""";
-
-        try (Connection con = DBConnection.getConnection();
-                PreparedStatement ps = con.prepareStatement(sql)) {
-
-            ps.setInt(1, p.getOrderId());
-            ps.setDouble(2, p.getAmount());
-            ps.setString(3, p.getPaymentMethod());
-            ps.setString(4, p.getTransactionStatus());
-            ps.executeUpdate();
-        }
-    }
-
-    public ArrayList<Payment> getPaymentsByOrder(int orderId) throws Exception {
+    public ArrayList<Payment> getAllPayments() throws Exception {
         ArrayList<Payment> list = new ArrayList<>();
-        String sql = "SELECT * FROM payment WHERE order_id = ? ORDER BY payment_id DESC";
-
-        try (Connection con = DBConnection.getConnection();
-                PreparedStatement ps = con.prepareStatement(sql)) {
-
-            ps.setInt(1, orderId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Payment p = new Payment();
-                    p.setPaymentId(rs.getInt("payment_id"));
-                    p.setOrderId(rs.getInt("order_id"));
-                    p.setPaymentDate(rs.getTimestamp("payment_date"));
-                    p.setAmount(rs.getDouble("amount"));
-                    p.setPaymentMethod(rs.getString("payment_method"));
-                    p.setTransactionStatus(rs.getString("transaction_status"));
-                    list.add(p);
-                }
-            }
-        }
-        return list;
-    }
-
-    public void updateStatus(int paymentId, String status) throws Exception {
-        String sql = "UPDATE payment SET transaction_status = ? WHERE payment_id = ?";
-
-        try (Connection con = DBConnection.getConnection();
-                PreparedStatement ps = con.prepareStatement(sql)) {
-
-            ps.setString(1, status);
-            ps.setInt(2, paymentId);
-            ps.executeUpdate();
-        }
-    }
-
-    public double getTotalRevenue() throws Exception {
-        String sql = "SELECT SUM(amount) FROM payment WHERE transaction_status = 'COMPLETED'";
+        String sql = """
+				SELECT p.*, CONCAT(a.first_name, ' ', a.last_name) AS customer_name
+				FROM payment p
+				INNER JOIN orders o ON p.order_id = o.order_id
+				INNER JOIN accounts a ON o.account_id = a.account_id
+				ORDER BY p.payment_date DESC
+				""";
 
         try (Connection con = DBConnection.getConnection();
                 PreparedStatement ps = con.prepareStatement(sql);
                 ResultSet rs = ps.executeQuery()) {
 
-            if (rs.next()) {
-                double total = rs.getDouble(1);
-                if (!rs.wasNull()) {
-                    return total;
-                }
+            while (rs.next()) {
+                Payment p = new Payment();
+                p.setPaymentId(rs.getInt("payment_id"));
+                p.setOrderId(rs.getInt("order_id"));
+                p.setPaymentMethod(rs.getString("payment_method"));
+                p.setAmount(rs.getDouble("amount"));
+                p.setPaymentDate(rs.getTimestamp("payment_date"));
+                p.setStatus(rs.getString("transaction_status"));
+                p.setCustomerName(rs.getString("customer_name"));
+                list.add(p);
             }
         }
-        return 0.0;
+        return list;
+    }
+    public void addProductSupplierLink(int productId, int supplierId, double supplyCost) throws Exception {
+        String sql = """
+				INSERT INTO provide (product_id, supplier_id, supply_cost) 
+				VALUES (?, ?, ?)
+				ON DUPLICATE KEY UPDATE supply_cost = ?
+				""";
+
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, productId);
+            ps.setInt(2, supplierId);
+            ps.setDouble(3, supplyCost);
+            ps.setDouble(4, supplyCost);
+
+            ps.executeUpdate();
+        }
+    }
+    public void insertWholesaleExpense(int productId, double wholesaleCost, int quantity) throws Exception {
+        String sql = "INSERT INTO payment (payment_method, amount, transaction_status) VALUES (?, ?, ?)";
+        double totalExpense = -(wholesaleCost * quantity);
+
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, "Supplier Invoice");
+            ps.setDouble(2, totalExpense);
+            ps.setString(3, "SUCCESS");
+
+            ps.executeUpdate();
+        }
+    }
+    public void insertPayment(Payment p) throws Exception {
+        String sql = "INSERT INTO payment (order_id, payment_method, amount, transaction_status) VALUES (?, ?, ?, ?)";
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, p.getOrderId());
+            ps.setString(2, p.getPaymentMethod());
+            ps.setDouble(3, p.getAmount());
+            ps.setString(4, p.getStatus());
+            ps.executeUpdate();
+        }
     }
 }

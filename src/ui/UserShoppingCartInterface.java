@@ -6,6 +6,7 @@ import dao.CartDAO;
 import dao.DBConnection;
 import dao.OrderDAO;
 import dao.OrderItemDAO;
+import dao.PaymentDAO;
 import dao.StockMovementDAO;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -15,6 +16,7 @@ import javafx.scene.layout.*;
 import model.Account;
 import model.CartItem;
 import model.OrderItem;
+import model.Payment;
 
 public class UserShoppingCartInterface extends BorderPane {
 
@@ -69,10 +71,12 @@ public class UserShoppingCartInterface extends BorderPane {
 		}
 	}
 
+
 	private void checkout() {
 		CartDAO cartDAO = new CartDAO();
 		OrderDAO orderDAO = new OrderDAO();
 		OrderItemDAO itemDAO = new OrderItemDAO();
+		PaymentDAO paymentDAO = new PaymentDAO();
 
 		try {
 			int session = cartDAO.getSession(account.getAccountId());
@@ -81,6 +85,11 @@ public class UserShoppingCartInterface extends BorderPane {
 			if (items.isEmpty()) {
 				new Alert(Alert.AlertType.WARNING, "Your cart is empty!").showAndWait();
 				return;
+			}
+
+			double totalAmount = 0.0;
+			for (CartItem c : items) {
+				totalAmount += (c.getPrice() * c.getQuantity());
 			}
 
 			try (Connection con = DBConnection.getConnection()) {
@@ -107,14 +116,20 @@ public class UserShoppingCartInterface extends BorderPane {
 								c.getProductId(),
 								c.getQuantity(),
 								deductionType,
-								"Stock deducted automatically for Order #" + orderId,
+								"Stock deducted for Order #" + orderId,
 								account.getAccountId(),
 								con
 						);
 					}
 
-					cartDAO.clearCart(session);
+					Payment payment = new Payment();
+					payment.setOrderId(orderId);
+					payment.setPaymentMethod("Credit Card");
+					payment.setAmount(totalAmount);
+					payment.setStatus("SUCCESS");
+					paymentDAO.insertPayment(payment);
 
+					cartDAO.clearCart(session);
 					con.commit();
 
 				} catch (Exception ex) {
@@ -123,12 +138,11 @@ public class UserShoppingCartInterface extends BorderPane {
 				}
 			}
 
-			new Alert(Alert.AlertType.INFORMATION, "Order Created Successfully!").showAndWait();
+			new Alert(Alert.AlertType.INFORMATION, "Order created! Total charged: $" + String.format("%.2f", totalAmount)).showAndWait();
 
 			if (onOrderPlaced != null) {
 				onOrderPlaced.run();
 			}
-
 			loadCart();
 
 		} catch (Exception e) {

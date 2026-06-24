@@ -17,11 +17,11 @@ public class AdminStockMovementInterface extends VBox {
 
 	private TableView<StockMovement> table;
 	private TableColumn<StockMovement, Integer> idCol;
-	private TableColumn<StockMovement, String> prodCol; // قلبناه String لعرض اسم المنتج
+	private TableColumn<StockMovement, String> prodCol;
 	private TableColumn<StockMovement, Integer> qtyCol;
-	private TableColumn<StockMovement, String> typeCol; // قلبناه String لعرض نوع الحركة نصياً
+	private TableColumn<StockMovement, String> typeCol;
 	private TableColumn<StockMovement, String> notesCol;
-	private TableColumn<StockMovement, String> dateCol; // عمود التاريخ والوقت الجديد
+	private TableColumn<StockMovement, String> dateCol;
 
 	private Button refreshBtn;
 	private StockMovementDAO dao;
@@ -33,25 +33,20 @@ public class AdminStockMovementInterface extends VBox {
 		setSpacing(15);
 		setPadding(new Insets(20));
 
-		// العنوان الرئيسي الفخم للشاشة
 		Label mainTitle = new Label("Warehouse Stock Movements Log");
 		mainTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
-		// شريط التحكم العلوي ويحتوي فقط على زر التحديث العام
 		HBox topBar = new HBox(10);
 		topBar.setAlignment(Pos.CENTER_LEFT);
 		refreshBtn = new Button("Refresh Log History");
 		refreshBtn.setStyle("-fx-font-weight: bold;");
 		topBar.getChildren().add(refreshBtn);
 
-		// بناء جدول المراقبة الواسع
 		createTable();
 
-		// تجميع الشاشة بشكل نظيف واحترافي
 		VBox.setVgrow(table, Priority.ALWAYS);
 		getChildren().addAll(mainTitle, topBar, table);
 
-		// تشغيل الأحداث
 		refreshBtn.setOnAction(e -> loadData());
 		loadData();
 	}
@@ -78,8 +73,7 @@ public class AdminStockMovementInterface extends VBox {
 		dateCol = new TableColumn<>("Timestamp");
 		dateCol.setCellValueFactory(new PropertyValueFactory<>("createdAt")); // ربط مع تاريخ ووقت الحركة
 
-		// 🔥 حركة UX: تلوين كميات الدخول باللون الأخضر والتالف/المبيعات باللون الأحمر
-		// تلقائياً
+
 		qtyCol.setCellFactory(column -> new TableCell<StockMovement, Integer>() {
 			@Override
 			protected void updateItem(Integer item, boolean empty) {
@@ -89,10 +83,10 @@ public class AdminStockMovementInterface extends VBox {
 					setStyle("");
 				} else {
 					StockMovement sm = (StockMovement) getTableRow().getItem();
-					if (sm != null && sm.getTypeId() == 1) { // 1 تعني Restock (دخول بضاعة)
+					if (sm != null && sm.getTypeId() == 1) {
 						setText("+" + item);
 						setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;");
-					} else { // أي حركة سحب أو مبيعات أو تالف تظهر بالسالب باللون الأحمر
+					} else {
 						setText("-" + item);
 						setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
 					}
@@ -101,12 +95,12 @@ public class AdminStockMovementInterface extends VBox {
 		});
 
 		// توزيع المساحات الهندسية بشكل متناسق ومريح للعين
-		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.08)); // 8%
-		prodCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.22)); // 22%
-		qtyCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15)); // 15%
-		typeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15)); // 15%
-		notesCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.22)); // 22%
-		dateCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.18)); // 18%
+		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.08));
+		prodCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.22));
+		qtyCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
+		typeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
+		notesCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.22));
+		dateCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.18));
 
 		table.getColumns().addAll(idCol, prodCol, qtyCol, typeCol, notesCol, dateCol);
 		table.setItems(movements);

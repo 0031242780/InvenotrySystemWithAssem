@@ -88,11 +88,10 @@ public class LoginInterface {
 				return;
 			}
 
-			// 🔥 التعديل هان: تعديل الفحص ليطابق النطاق الرسمي المعتمد بالسيستم @tech.com
 			if (account.getEmail().toLowerCase().endsWith("@tech.com")) {
-				new AdminDashboard(stage); // يفتح لوحة تحكم الآدمن فوراً
+				new AdminDashboard(stage);
 			} else {
-				new UserCustomerDashboard(stage, account); // يفتح لوحة الزبون
+				new UserCustomerDashboard(stage, account);
 			}
 
 		} catch (Exception e) {

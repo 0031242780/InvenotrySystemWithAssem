@@ -72,7 +72,7 @@ public class Product {
 	}
 
 	public void setPrice(double price) {
-		this.price = price;
+		this.price = cost*1.5;
 	}
 
 	public void setWholeSalePrice(double wholeSalePrice) {

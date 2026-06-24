@@ -17,7 +17,6 @@ public class AdminSupplierInterface extends BorderPane {
 
 	private TableView<Supplier> table;
 
-	// Added Side-Car Table View for Many-to-Many products & wholesale cost mapping
 	private TableView<Product> supplierProductsTable;
 	private ProductDAO productDAO = new ProductDAO();
 
@@ -38,6 +37,10 @@ public class AdminSupplierInterface extends BorderPane {
 	private Button refreshBtn;
 	private Button clearBtn;
 
+	private ComboBox<Product> productComboBox;
+	private TextField supplyCostField;
+	private Button linkProductBtn;
+
 	private GridPane form;
 	private HBox buttons;
 	private SupplierDAO dao;
@@ -56,6 +59,7 @@ public class AdminSupplierInterface extends BorderPane {
 
 		createForm();
 		loadSuppliers();
+		loadProductsToCombo();
 	}
 
 	private void createFields() {
@@ -63,6 +67,14 @@ public class AdminSupplierInterface extends BorderPane {
 		contactField = new TextField();
 		emailField = new TextField();
 		activeBox = new CheckBox("Active Status");
+
+		productComboBox = new ComboBox<>();
+		productComboBox.setPromptText("Select Product");
+		productComboBox.setPrefWidth(200);
+
+		supplyCostField = new TextField();
+		supplyCostField.setPromptText("Wholesale Cost ($)");
+		supplyCostField.setPrefWidth(130);
 	}
 
 	private void createButtons() {
@@ -81,8 +93,15 @@ public class AdminSupplierInterface extends BorderPane {
 		addBtn.setOnAction(e -> addSupplier());
 		updateBtn.setOnAction(e -> updateSupplier());
 		deleteBtn.setOnAction(e -> deleteSupplier());
-		refreshBtn.setOnAction(e -> loadSuppliers());
+		refreshBtn.setOnAction(e -> {
+			loadSuppliers();
+			loadProductsToCombo();
+		});
 		clearBtn.setOnAction(e -> clearFields());
+
+		linkProductBtn = new Button("Link Product to Supplier");
+		linkProductBtn.setStyle("-fx-font-weight: bold;");
+		linkProductBtn.setOnAction(e -> handleLinkProductToSupplier());
 	}
 
 	private void createTable() {
@@ -126,7 +145,6 @@ public class AdminSupplierInterface extends BorderPane {
 		table.getColumns().addAll(companyCol, contactCol, emailCol, activeCol);
 		table.setItems(suppliers);
 
-
 		table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
 			if (newValue != null) {
 				fillFields(newValue);
@@ -141,7 +159,7 @@ public class AdminSupplierInterface extends BorderPane {
 		supplierProductsTable = new TableView<>();
 		supplierProductsTable.setPlaceholder(new Label("Select a supplier from above to view their provided products and costs."));
 		supplierProductsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-		supplierProductsTable.setPrefHeight(250);
+		supplierProductsTable.setPrefHeight(220);
 
 		TableColumn<Product, String> pNameCol = new TableColumn<>("Supplied Product Name");
 		pNameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
@@ -163,7 +181,7 @@ public class AdminSupplierInterface extends BorderPane {
 					setStyle("");
 				} else {
 					setText(String.format("$%.2f", item));
-					setStyle("-fx-text-fill: #e67e22; -fx-font-weight: bold;"); // Clean Amber indicator styling
+					setStyle("-fx-text-fill: #e67e22; -fx-font-weight: bold;");
 				}
 			}
 		});
@@ -206,10 +224,21 @@ public class AdminSupplierInterface extends BorderPane {
 		Label subTitle = new Label("Products by Selected Supplier");
 		subTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 
+		HBox linkingActionStrip = new HBox(10);
+		linkingActionStrip.setAlignment(Pos.CENTER_LEFT);
+		linkingActionStrip.setPadding(new Insets(5, 10, 10, 10));
+		linkingActionStrip.setStyle("-fx-background-color: #f9fafb; -fx-background-radius: 5; -fx-border-color: #e5e7eb;");
+		linkingActionStrip.getChildren().addAll(
+				new Label("Assign New Product:"), productComboBox,
+				new Label("Cost:"), supplyCostField,
+				linkProductBtn
+		);
+
 		centerLayout.getChildren().addAll(
 				table,
 				subTitle,
-				supplierProductsTable
+				supplierProductsTable,
+				linkingActionStrip
 		);
 
 		VBox.setVgrow(table, Priority.ALWAYS);
@@ -226,6 +255,62 @@ public class AdminSupplierInterface extends BorderPane {
 		} catch (Exception e) {
 			e.printStackTrace();
 			showAlert(Alert.AlertType.ERROR, "Data Error", "Failed to retrieve vendor items", e.getMessage());
+		}
+	}
+
+	private void loadProductsToCombo() {
+		try {
+			ObservableList<Product> products = FXCollections.observableArrayList(productDAO.getAllProducts());
+			productComboBox.setItems(products);
+
+			productComboBox.setCellFactory(lv -> new ListCell<>() {
+				@Override protected void updateItem(Product p, boolean empty) {
+					super.updateItem(p, empty);
+					setText((empty || p == null) ? "" : p.getProductName() + " [" + p.getBarcode() + "]");
+				}
+			});
+			productComboBox.setButtonCell(productComboBox.getCellFactory().call(null));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void handleLinkProductToSupplier() {
+		Supplier selectedSupplier = table.getSelectionModel().getSelectedItem();
+		Product selectedProduct = productComboBox.getValue();
+		String costText = supplyCostField.getText().trim();
+
+		if (selectedSupplier == null) {
+			showAlert(Alert.AlertType.WARNING, "Selection Required", null, "Please select a Supplier from the top table first!");
+			return;
+		}
+
+		if (selectedProduct == null || costText.isEmpty()) {
+			showAlert(Alert.AlertType.WARNING, "Missing Data", null, "Please select a product and provide a wholesale cost value.");
+			return;
+		}
+
+		try {
+			double wholesaleCost = Double.parseDouble(costText);
+			if (wholesaleCost < 0) {
+				showAlert(Alert.AlertType.ERROR, "Invalid Amount", null, "Wholesale cost amount criteria cannot be negative.");
+				return;
+			}
+
+
+			productDAO.addProductSupplierLink(selectedProduct.getProductId(), selectedSupplier.getSupplierId(), wholesaleCost);
+
+			showAlert(Alert.AlertType.INFORMATION, "Success", null, "Product successfully linked to this supplier!");
+
+			supplyCostField.clear();
+			productComboBox.setValue(null);
+			loadSubTableProducts(selectedSupplier.getSupplierId());
+
+		} catch (NumberFormatException nfe) {
+			showAlert(Alert.AlertType.ERROR, "Format Error", null, "Please enter a valid numeric value for the supply cost.");
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			showAlert(Alert.AlertType.ERROR, "Database Writing Error", null, ex.getMessage());
 		}
 	}
 
@@ -316,6 +401,8 @@ public class AdminSupplierInterface extends BorderPane {
 		activeBox.setSelected(false);
 		table.getSelectionModel().clearSelection();
 		supplierProductsTable.getItems().clear();
+		supplyCostField.clear();
+		productComboBox.setValue(null);
 	}
 
 	private void showAlert(Alert.AlertType type, String title, String header, String content) {

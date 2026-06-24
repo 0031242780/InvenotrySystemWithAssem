@@ -48,11 +48,11 @@ public class AdminCustomerInterface extends VBox {
 		phoneCol.setCellValueFactory(new PropertyValueFactory<>("phoneNumber"));
 
 
-		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10)); // 10%
-		firstCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20)); // 20%
-		lastCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20)); // 20%
-		emailCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.30)); // 30%
-		phoneCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20)); // 20%
+		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
+		firstCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20));
+		lastCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20));
+		emailCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.30));
+		phoneCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.20));
 
 		table.getColumns().addAll(idCol, firstCol, lastCol, emailCol, phoneCol);
 

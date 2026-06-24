@@ -26,7 +26,6 @@ public class AdminInventoryInterface extends BorderPane {
 	public AdminInventoryInterface() {
 		dao = new ProductDAO();
 
-		// العنوان العلوي الفخم للشاشة لتتناسق مع باقي التصاميم
 		Label mainTitle = new Label("Inventory Stock Management");
 		mainTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #0B1E3A;");
 		mainTitle.setPadding(new Insets(0, 0, 10, 0));
@@ -34,7 +33,6 @@ public class AdminInventoryInterface extends BorderPane {
 		createTable();
 		loadData();
 
-		// بناء وتجميع الهيكل
 		container = new VBox(10);
 		container.setPadding(new Insets(20));
 		container.getChildren().addAll(mainTitle, table);
@@ -57,7 +55,6 @@ public class AdminInventoryInterface extends BorderPane {
 		qtyCol = new TableColumn<>("Quantity In Stock");
 		qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
 
-		// تنسيق فني لعمود الكمية ليظهر بشكل مميز
 		qtyCol.setCellFactory(column -> new TableCell<Product, Integer>() {
 			@Override
 			protected void updateItem(Integer item, boolean empty) {
@@ -68,7 +65,6 @@ public class AdminInventoryInterface extends BorderPane {
 				} else {
 					setText(String.valueOf(item));
 					if (item <= 5) {
-						// تلوين الكميات الحرجة باللون البرتقالي لتنبيه الآدمن
 						setStyle("-fx-text-fill: #e67e22; -fx-font-weight: bold;");
 					} else {
 						setStyle("-fx-text-fill: #2c3e50;");
@@ -77,10 +73,9 @@ public class AdminInventoryInterface extends BorderPane {
 			}
 		});
 
-		// توزيع النسب المئوية لعرض الأعمدة بالتساوي وبشكل مريح للعين
-		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15)); // 15%
-		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.60)); // 60%
-		qtyCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25)); // 25%
+		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
+		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.60));
+		qtyCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.25));
 
 		table.getColumns().addAll(idCol, nameCol, qtyCol);
 		table.setItems(products);
@@ -89,7 +84,6 @@ public class AdminInventoryInterface extends BorderPane {
 	private void loadData() {
 		try {
 			products.clear();
-			// 🔥 الآن تستدعي الدالة المطورة بنجاح وبدون معاملات لتعبئة القائمة كاملة
 			ArrayList<Product> inventoryList = dao.getInventory();
 			products.addAll(inventoryList);
 			table.refresh();
@@ -100,15 +94,12 @@ public class AdminInventoryInterface extends BorderPane {
 		}
 	}
 
-	// 🔥 دالة الـ Alerts الذكية التي يتلائم حجمها ديناميكياً مع طول محتوى الرسالة
-	// بالملّي
 	private void showAlert(Alert.AlertType type, String title, String header, String content) {
 		Alert alert = new Alert(type);
 		alert.setTitle(title);
 		alert.setHeaderText(header);
 		alert.setContentText(content);
 
-		// السطر السحري لمنع تشوه حجم البوكس واحتواء النص بالكامل
 		alert.getDialogPane().setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
 
 		alert.showAndWait();

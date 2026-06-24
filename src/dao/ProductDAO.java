@@ -17,13 +17,14 @@ public class ProductDAO {
     public ArrayList<Product> getAllProducts() throws Exception {
         ArrayList<Product> list = new ArrayList<>();
         String sql = """
-				SELECT p.*, c.category_name,
+				SELECT p.*, c.category_name, i.quantity_in_stock AS stock_qty,
 				       (SELECT MIN(cost) FROM provide WHERE product_id = p.product_id) AS lowest_cost,
 				       (SELECT d.discounted_price FROM discount d 
 				        WHERE d.product_id = p.product_id AND NOW() BETWEEN d.start_date AND d.end_date 
 				        LIMIT 1) AS active_discount
 				FROM product p
 				LEFT JOIN category c ON p.category_id = c.category_id
+				LEFT JOIN inventory i ON p.product_id = i.product_id
 				""";
         try (Connection con = DBConnection.getConnection();
                 PreparedStatement ps = con.prepareStatement(sql);
@@ -36,6 +37,7 @@ public class ProductDAO {
                 p.setDescription(rs.getString("descrption"));
                 p.setCategoryId(rs.getInt("category_id"));
                 p.setCategoryName(rs.getString("category_name"));
+                p.setQuantity(rs.getInt("stock_qty"));
 
                 double baseCost = rs.getDouble("lowest_cost");
                 p.setCost(baseCost);
@@ -124,12 +126,13 @@ public class ProductDAO {
     public ArrayList<Product> getProductsByCategory(int categoryId) throws Exception {
         ArrayList<Product> list = new ArrayList<>();
         String sql = """
-				SELECT p.*,
+				SELECT p.*, i.quantity_in_stock AS stock_qty,
 				       (SELECT MIN(cost) FROM provide WHERE product_id = p.product_id) AS lowest_cost,
 				       (SELECT d.discounted_price FROM discount d 
 				        WHERE d.product_id = p.product_id AND NOW() BETWEEN d.start_date AND d.end_date 
 				        LIMIT 1) AS active_discount
 				FROM product p
+				LEFT JOIN inventory i ON p.product_id = i.product_id
 				WHERE p.category_id = ?
 				""";
         try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
@@ -142,6 +145,7 @@ public class ProductDAO {
                     p.setBarcode(rs.getString("barcode"));
                     p.setDescription(rs.getString("descrption"));
                     p.setCategoryId(rs.getInt("category_id"));
+                    p.setQuantity(rs.getInt("stock_qty"));
 
                     double baseCost = rs.getDouble("lowest_cost");
                     p.setCost(baseCost);
@@ -223,5 +227,38 @@ public class ProductDAO {
             }
         }
         return list;
+    }
+
+    public void addProductSupplierLink(int productId, int supplierId, double supplyCost) throws Exception {
+        String sql = "INSERT INTO provide (product_id, supplier_id, cost) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cost = ?";
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, productId);
+            ps.setInt(2, supplierId);
+            ps.setDouble(3, supplyCost);
+            ps.setDouble(4, supplyCost);
+            ps.executeUpdate();
+        }
+    }
+
+    public void updateStock(int productId, int addedQuantity) throws Exception {
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                int replenishmentType = 1;
+                StockMovementDAO.logMovementAndUpdateStock(
+                        productId,
+                        addedQuantity,
+                        replenishmentType,
+                        "Manual Resupply Increment Adjustment Pattern Run",
+                        1,
+                        con
+                );
+                con.commit();
+            } catch (Exception ex) {
+                con.rollback();
+                throw ex;
+            }
+        }
     }
 }
