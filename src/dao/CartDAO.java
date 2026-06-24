@@ -22,7 +22,6 @@ public class CartDAO {
 
 		}
 
-		// اذا ما في session اعمل وحدة
 
 		String insert = "INSERT INTO shopping_session(create_at,updated_at,account_id) VALUES(NOW(),NOW(),?)";
 
@@ -72,48 +71,46 @@ public class CartDAO {
 	}
 
 	public ArrayList<CartItem> getCart(int sessionId) throws Exception {
-
 		ArrayList<CartItem> list = new ArrayList<>();
 
-		// استعلام ذكي: بيفحص لو في سعر مخفض فعال (بين تاريخ البداية والنهاية) بياخده،
-		// وإلا بياخد السعر الأصلي
 		String sql = """
-				SELECT ci.*, p.product_name,
-				       IFNULL(
-				           (SELECT d.discounted_price FROM discount d
-				            WHERE d.product_id = p.product_id AND NOW() BETWEEN d.start_date AND d.end_date
-				            LIMIT 1),
-				           p.price
-				       ) AS final_price
-				FROM cart_item ci
-				INNER JOIN product p ON ci.product_id = p.product_id
-				WHERE ci.session_id = ?
-				""";
+            SELECT 
+                ci.session_id, ci.product_id, ci.quantity, p.product_name, 
+                pp.retail_price, d.discounted_price
+            FROM cart_item ci
+            LEFT JOIN product p ON ci.product_id = p.product_id
+            LEFT JOIN product_pricing pp ON p.product_id = pp.product_id
+            LEFT JOIN discount d ON d.product_id = p.product_id 
+                AND NOW() BETWEEN d.start_date AND d.end_date
+            WHERE ci.session_id = ?
+            """;
 
 		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-
 			ps.setInt(1, sessionId);
 			ResultSet rs = ps.executeQuery();
 
 			while (rs.next()) {
-
 				CartItem c = new CartItem();
 				c.setSessionId(rs.getInt("session_id"));
 				c.setProductId(rs.getInt("product_id"));
 				c.setQuantity(rs.getInt("quantity"));
 				c.setProductName(rs.getString("product_name"));
 
-				// هان بناخد السعر النهائي المصلح (سواء كان الأصلي أو المخصوم) وبنضربه بالكمية
-				double finalPrice = rs.getDouble("final_price");
-				int qty = rs.getInt("quantity");
-				c.setPrice(finalPrice * qty);
+				double retailPrice = rs.getDouble("retail_price");
+				double discountedPrice = rs.getDouble("discounted_price");
+
+				double finalUnitPrice = retailPrice;
+				if (!rs.wasNull() && discountedPrice > 0) {
+					finalUnitPrice = discountedPrice;
+				}
+
+				c.setPrice(finalUnitPrice * rs.getInt("quantity"));
 
 				list.add(c);
 			}
 		}
 		return list;
 	}
-
 	public void clearCart(int sessionId) throws Exception {
 
 		String sql = "DELETE FROM cart_item WHERE session_id=?";

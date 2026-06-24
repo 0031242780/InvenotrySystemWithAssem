@@ -1,14 +1,22 @@
 package model;
 
-public class Supplier {
+import java.util.ArrayList;
 
+public class Supplier {
 	private int supplierId;
 	private String companyName;
 	private String contactPerson;
 	private String email;
-	private boolean active;
+	private boolean isActive;
 
-	public Supplier() {
+	private ArrayList<String> phoneNumbers = new ArrayList<>();
+
+	public ArrayList<String> getPhoneNumbers() {
+		return phoneNumbers;
+	}
+
+	public void setPhoneNumbers(ArrayList<String> phoneNumbers) {
+		this.phoneNumbers = phoneNumbers;
 	}
 
 	public int getSupplierId() {
@@ -44,16 +52,11 @@ public class Supplier {
 	}
 
 	public boolean isActive() {
-		return active;
+		return isActive;
 	}
 
-	public void setActive(boolean active) {
-		this.active = active;
-	}
-
-	@Override
-	public String toString() {
-		return this.companyName;
+	public void setActive(boolean isActive) {
+		this.isActive = isActive;
 	}
 
 }

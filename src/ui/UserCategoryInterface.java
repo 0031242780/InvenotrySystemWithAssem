@@ -8,9 +8,11 @@ import dao.ProductDAO;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import model.Account;
 import model.Category;
@@ -28,23 +30,22 @@ public class UserCategoryInterface extends BorderPane {
 	private ObservableList<Category> categories = FXCollections.observableArrayList();
 	private ObservableList<Product> products = FXCollections.observableArrayList();
 
+	private Spinner<Integer> quantitySpinner;
+
 	public UserCategoryInterface(Account account) {
 		this.account = account;
 		categoryDAO = new CategoryDAO();
 		productDAO = new ProductDAO();
 
-		// 1. إنشاء جدول الفئات
 		categoryTable = new TableView<>();
-		TableColumn<Category, Integer> catIdCol = new TableColumn<>("Category ID");
-		catIdCol.setCellValueFactory(new PropertyValueFactory<>("categoryId"));
+
 		TableColumn<Category, String> catNameCol = new TableColumn<>("Category Name");
 		catNameCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
-		categoryTable.getColumns().addAll(catIdCol, catNameCol);
+		categoryTable.getColumns().addAll(catNameCol);
 		categoryTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 		categoryTable.setItems(categories);
 		categoryTable.setPrefHeight(200);
 
-		// 2. إنشاء جدول المنتجات التابعة للفئة
 		productTable = new TableView<>();
 		TableColumn<Product, String> pNameCol = new TableColumn<>("Product Name");
 		pNameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
@@ -57,8 +58,13 @@ public class UserCategoryInterface extends BorderPane {
 		productTable.setItems(products);
 		productTable.setPrefHeight(300);
 
-		// 3. زر إضافة المنتج المحدد إلى السلة
 		Button addToCartBtn = new Button("Add Selected Product To Cart");
+
+		Label qtyLabel = new Label("Qty:");
+		quantitySpinner = new Spinner<>(1, 100, 1);
+		quantitySpinner.setPrefWidth(80);
+		quantitySpinner.setEditable(true);
+
 		addToCartBtn.setOnAction(e -> {
 			Product selectedProduct = productTable.getSelectionModel().getSelectedItem();
 			if (selectedProduct == null) {
@@ -66,27 +72,39 @@ public class UserCategoryInterface extends BorderPane {
 				return;
 			}
 			try {
+				int quantity = quantitySpinner.getValue();
+
 				CartDAO cartDAO = new CartDAO();
 				int session = cartDAO.getSession(account.getAccountId());
-				cartDAO.addToCart(session, selectedProduct.getProductId(), 1);
-				new Alert(Alert.AlertType.INFORMATION, "Product added to cart!").showAndWait();
+
+				cartDAO.addToCart(session, selectedProduct.getProductId(), quantity);
+
+				new Alert(Alert.AlertType.INFORMATION, "Successfully added " + quantity + " item(s) to cart.").showAndWait();
+
+				quantitySpinner.getValueFactory().setValue(1);
 			} catch (Exception ex) {
 				ex.printStackTrace();
+				new Alert(Alert.AlertType.ERROR, "Could not add item to cart: " + ex.getMessage()).showAndWait();
 			}
 		});
 
-		// 4. مراقبة الضغط على الفئة: عند اختيار فئة، يتم تحميل بضاعتها فوراً
 		categoryTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
 			if (newVal != null) {
 				loadCategoryProducts(newVal.getCategoryId());
 			}
 		});
 
-		// ترتيب الواجهة داخل صندوق عمودي بسيط
+		HBox actionBox = new HBox(10);
+		actionBox.setAlignment(Pos.CENTER_LEFT);
+		actionBox.getChildren().addAll(qtyLabel, quantitySpinner, addToCartBtn);
+
 		VBox layout = new VBox(10);
 		layout.setPadding(new Insets(10));
-		layout.getChildren().addAll(new Label("Select a Category:"), categoryTable,
-				new Label("Products in this Category:"), productTable, addToCartBtn);
+		layout.getChildren().addAll(
+				new Label("Select a Category:"), categoryTable,
+				new Label("Products in this Category:"), productTable,
+				actionBox
+		);
 
 		setCenter(layout);
 		loadCategories();
@@ -103,15 +121,9 @@ public class UserCategoryInterface extends BorderPane {
 
 	private void loadCategoryProducts(int categoryId) {
 		try {
-			// 1. تنظيف الجدول أولاً
 			products.clear();
-
-			// 2. جلب القائمة البسيطة من الـ DAO
 			ArrayList<Product> list = productDAO.getProductsByCategory(categoryId);
-
-			// 3. إضافتها للجدول مباشرة بدون أي تعارض في الأنواع
 			products.addAll(list);
-
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

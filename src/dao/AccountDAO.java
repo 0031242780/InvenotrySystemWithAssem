@@ -6,7 +6,6 @@ import java.util.ArrayList;
 
 public class AccountDAO {
 
-	// ➕ 1. دالة الإضافة الديناميكية
 	public void insert(Account a) throws Exception {
 		String sql = "INSERT INTO accounts(role_id, email, password_, first_name, last_name, phone_number, city, street) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -25,7 +24,6 @@ public class AccountDAO {
 		}
 	}
 
-	// 🔄 2. دالة التعديل لشاشة إدارة الحسابات
 	public void update(Account a) throws Exception {
 		String sql = "UPDATE accounts SET role_id = ?, email = ?, first_name = ?, last_name = ?, phone_number = ? WHERE account_id = ?";
 
@@ -42,7 +40,6 @@ public class AccountDAO {
 		}
 	}
 
-	// 🔄 3. تحويل الحذف الفعلي إلى تعطيل حساب (Soft Delete) لحماية ترابط البيانات
 	public void deactivate(int accountId) throws Exception {
 		String sql = "UPDATE accounts SET is_active = FALSE WHERE account_id = ?";
 
@@ -53,9 +50,7 @@ public class AccountDAO {
 		}
 	}
 
-	// 🔑 4. دالة تسجيل الدخول المحدثة (تمنع دخول الحسابات المعطلة)
 	public Account login(String email, String password) throws Exception {
-		// 🔥 أضفنا شرط حماية أمني: AND a.is_active = TRUE
 		String sql = "SELECT a.*, r.role_name, r.permission_level " + "FROM accounts a "
 				+ "JOIN roles r ON a.role_id = r.role_id " + "WHERE a.email=? AND a.password_=? AND a.is_active = TRUE";
 
@@ -79,7 +74,6 @@ public class AccountDAO {
 		return null;
 	}
 
-	// 📊 5. دالة جلب كافة الحسابات (محدثة لتقرأ الحالة وتمررها للـ UI)
 	public ArrayList<Account> getAllAccounts() throws Exception {
 		ArrayList<Account> list = new ArrayList<>();
 		String sql = "SELECT a.*, r.role_name FROM accounts a JOIN roles r ON a.role_id = r.role_id";
@@ -100,7 +94,6 @@ public class AccountDAO {
 				a.setStreet(rs.getString("street"));
 				a.setRoleName(rs.getString("role_name"));
 
-				// 🔥 هان السطر السحري اللي كان ناقص عشان يغذي الـ UI بالحالة الصح
 				a.setActive(rs.getBoolean("is_active"));
 
 				list.add(a);
@@ -109,10 +102,13 @@ public class AccountDAO {
 		return list;
 	}
 
-	// 🛒 6. دالة جلب الزبائن فقط (رقم 3)
 	public ArrayList<Account> getCustomers() throws Exception {
 		ArrayList<Account> list = new ArrayList<>();
-		String sql = "SELECT * FROM accounts WHERE role_id = 3";
+		String sql = """
+				SELECT a.* FROM accounts a 
+				INNER JOIN roles r ON a.role_id = r.role_id 
+				WHERE r.role_name = 'CUSTOMER'
+				""";
 
 		try (Connection con = DBConnection.getConnection();
 				PreparedStatement ps = con.prepareStatement(sql);
@@ -126,16 +122,19 @@ public class AccountDAO {
 				a.setFirstName(rs.getString("first_name"));
 				a.setLastName(rs.getString("last_name"));
 				a.setPhoneNumber(rs.getString("phone_number"));
-
 				list.add(a);
 			}
 		}
 		return list;
 	}
 
-	// 🧮 7. دالة عدّ الزبائن للداشبورد
 	public int countCustomers() throws Exception {
-		String sql = "SELECT COUNT(*) FROM accounts WHERE role_id = 3";
+		String sql = """
+				SELECT COUNT(*) 
+				FROM accounts a 
+				INNER JOIN roles r ON a.role_id = r.role_id 
+				WHERE r.role_name = 'CUSTOMER'
+				""";
 
 		try (Connection con = DBConnection.getConnection();
 				PreparedStatement ps = con.prepareStatement(sql);
@@ -145,5 +144,26 @@ public class AccountDAO {
 				return rs.getInt(1);
 		}
 		return 0;
+	}
+	public void updateProfile(Account a) throws Exception {
+		String sql = """
+				UPDATE accounts 
+				SET password_ = ?, first_name = ?, last_name = ?, phone_number = ?, city = ?, street = ? 
+				WHERE account_id = ?
+				""";
+
+		try (Connection con = DBConnection.getConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
+
+			ps.setString(1, a.getPassword());
+			ps.setString(2, a.getFirstName());
+			ps.setString(3, a.getLastName());
+			ps.setString(4, a.getPhoneNumber());
+			ps.setString(5, a.getCity());
+			ps.setString(6, a.getStreet());
+			ps.setInt(7, a.getAccountId());
+
+			ps.executeUpdate();
+		}
 	}
 }

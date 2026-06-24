@@ -6,10 +6,13 @@ public class Product {
 	private String barcode;
 	private String description;
 	private int categoryId;
-	private int supplierId;
+	private double wholeSalePrice;
 	private double price;
 	private double discountPrice;
 	private int quantity;
+	private double cost;
+	private String categoryName;
+
 
 	public int getQuantity() {
 		return quantity;
@@ -18,13 +21,6 @@ public class Product {
 	public void setQuantity(int quantity) {
 		this.quantity = quantity;
 	}
-
-	// 🔥 الحقول الجديدة المضافة للكوست وعرض الأسماء
-	private double cost;
-	private String categoryName;
-	private String supplierName;
-
-	// --- الـ Getters والـ Setters المكتملة هندسياً ---
 
 	public int getProductId() {
 		return productId;
@@ -66,20 +62,21 @@ public class Product {
 		this.categoryId = categoryId;
 	}
 
-	public int getSupplierId() {
-		return supplierId;
-	}
-
-	public void setSupplierId(int supplierId) {
-		this.supplierId = supplierId;
-	}
 
 	public double getPrice() {
 		return price;
 	}
 
+	public double getWholeSalePrice() {
+		return wholeSalePrice;
+	}
+
 	public void setPrice(double price) {
-		this.price = price;
+		this.price = cost*1.5;
+	}
+
+	public void setWholeSalePrice(double wholeSalePrice) {
+		this.wholeSalePrice = wholeSalePrice;
 	}
 
 	public double getDiscountPrice() {
@@ -106,11 +103,4 @@ public class Product {
 		this.categoryName = categoryName;
 	}
 
-	public String getSupplierName() {
-		return supplierName;
-	}
-
-	public void setSupplierName(String supplierName) {
-		this.supplierName = supplierName;
-	}
 }

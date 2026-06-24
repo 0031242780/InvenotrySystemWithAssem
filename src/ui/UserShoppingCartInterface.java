@@ -1,9 +1,13 @@
 package ui;
 
+import java.sql.Connection;
 import java.util.ArrayList;
 import dao.CartDAO;
+import dao.DBConnection;
 import dao.OrderDAO;
 import dao.OrderItemDAO;
+import dao.PaymentDAO;
+import dao.StockMovementDAO;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
@@ -12,13 +16,14 @@ import javafx.scene.layout.*;
 import model.Account;
 import model.CartItem;
 import model.OrderItem;
+import model.Payment;
 
 public class UserShoppingCartInterface extends BorderPane {
 
 	private Account account;
 	private TableView<CartItem> table;
 	private Button checkoutBtn;
-	private Runnable onOrderPlaced; // Callback لتحديث لوحة التحكم بعد الشراء
+	private Runnable onOrderPlaced;
 
 	public UserShoppingCartInterface(Account account, Runnable onOrderPlaced) {
 		this.account = account;
@@ -42,9 +47,6 @@ public class UserShoppingCartInterface extends BorderPane {
 	private void createTable() {
 		table = new TableView<>();
 
-		TableColumn<CartItem, Integer> productCol = new TableColumn<>("Product ID");
-		productCol.setCellValueFactory(new PropertyValueFactory<>("productId"));
-
 		TableColumn<CartItem, String> nameCol = new TableColumn<>("Product");
 		nameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
 
@@ -54,7 +56,7 @@ public class UserShoppingCartInterface extends BorderPane {
 		TableColumn<CartItem, Double> priceCol = new TableColumn<>("Price");
 		priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
 
-		table.getColumns().addAll(productCol, nameCol, quantityCol, priceCol);
+		table.getColumns().addAll(nameCol, quantityCol, priceCol);
 		table.setPrefHeight(500);
 		table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 	}
@@ -69,12 +71,14 @@ public class UserShoppingCartInterface extends BorderPane {
 		}
 	}
 
-	private void checkout() {
-		try {
-			CartDAO cartDAO = new CartDAO();
-			OrderDAO orderDAO = new OrderDAO();
-			OrderItemDAO itemDAO = new OrderItemDAO();
 
+	private void checkout() {
+		CartDAO cartDAO = new CartDAO();
+		OrderDAO orderDAO = new OrderDAO();
+		OrderItemDAO itemDAO = new OrderItemDAO();
+		PaymentDAO paymentDAO = new PaymentDAO();
+
+		try {
 			int session = cartDAO.getSession(account.getAccountId());
 			ArrayList<CartItem> items = cartDAO.getCart(session);
 
@@ -83,38 +87,62 @@ public class UserShoppingCartInterface extends BorderPane {
 				return;
 			}
 
-			// 1. احسب المجموع الإجمالي للطلب كامل أولاً
-			double totalOrderPrice = 0.0;
+			double totalAmount = 0.0;
 			for (CartItem c : items) {
-				totalOrderPrice += c.getQuantity() * c.getPrice(); // الكمية × السعر
+				totalAmount += (c.getPrice() * c.getQuantity());
 			}
 
-			// 2. تم الإصلاح: مرر المجموع الحقيقي المحسوب (totalOrderPrice) بدلاً من الصفر
-			// الثابت
-			int orderId = orderDAO.createOrder(totalOrderPrice, account.getAccountId());
+			try (Connection con = DBConnection.getConnection()) {
+				con.setAutoCommit(false);
+				try {
+					int initialStatusId = 1;
+					int orderId = orderDAO.createOrder(initialStatusId, account.getAccountId());
 
-			for (CartItem c : items) {
-				OrderItem item = new OrderItem();
-				item.setOrderId(orderId);
-				item.setProductId(c.getProductId());
-				item.setQuantity(c.getQuantity());
+					if (orderId == -1) {
+						throw new Exception("Failed to generate order reference ID.");
+					}
 
-				// إرسال السعر الفعلي للمنتج عند الشراء
-				item.setPriceAtPurchase(c.getPrice());
+					for (CartItem c : items) {
+						OrderItem item = new OrderItem();
+						item.setOrderId(orderId);
+						item.setProductId(c.getProductId());
+						item.setQuantity(c.getQuantity());
+						item.setPriceAtPurchase(c.getPrice());
 
-				itemDAO.insert(item);
+						itemDAO.insert(item);
+
+						int deductionType = 2;
+						StockMovementDAO.logMovementAndUpdateStock(
+								c.getProductId(),
+								c.getQuantity(),
+								deductionType,
+								"Stock deducted for Order #" + orderId,
+								account.getAccountId(),
+								con
+						);
+					}
+
+					Payment payment = new Payment();
+					payment.setOrderId(orderId);
+					payment.setPaymentMethod("Credit Card");
+					payment.setAmount(totalAmount);
+					payment.setStatus("SUCCESS");
+					paymentDAO.insertPayment(payment);
+
+					cartDAO.clearCart(session);
+					con.commit();
+
+				} catch (Exception ex) {
+					con.rollback();
+					throw ex;
+				}
 			}
 
-			// تفريغ عربة التسوق بعد الشراء بنجاح
-			cartDAO.clearCart(session);
+			new Alert(Alert.AlertType.INFORMATION, "Order created! Total charged: $" + String.format("%.2f", totalAmount)).showAndWait();
 
-			new Alert(Alert.AlertType.INFORMATION, "Order Created Successfully!").showAndWait();
-
-			// تشغيل التحديث التلقائي فوراً لتنعكس التغييرات في الواجهة الرئيسية للزبون
 			if (onOrderPlaced != null) {
 				onOrderPlaced.run();
 			}
-
 			loadCart();
 
 		} catch (Exception e) {

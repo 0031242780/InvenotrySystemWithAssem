@@ -21,8 +21,8 @@ public class AdminRolesInterface extends VBox {
 	private TableColumn<Account, Boolean> statusCol;
 
 	private TextField emailField;
-	private PasswordField passwordField; // 🔥 حقل كلمة المرور الجديد بالـ UI
-	private TextField firstNameField;
+	private PasswordField passwordField;
+	TextField firstNameField;
 	private TextField lastNameField;
 	private TextField phoneField;
 	private ComboBox<String> roleComboBox;
@@ -48,7 +48,6 @@ public class AdminRolesInterface extends VBox {
 		HBox contentRow = new HBox(20);
 		VBox.setVgrow(contentRow, Priority.ALWAYS);
 
-		// --- إعداد الجدول وتمديده هندسياً ---
 		table = new TableView<>();
 		HBox.setHgrow(table, Priority.ALWAYS);
 		table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
@@ -106,7 +105,6 @@ public class AdminRolesInterface extends VBox {
 		table.getColumns().addAll(idCol, emailCol, firstNameCol, lastNameCol, roleCol, statusCol);
 		table.setItems(accountsList);
 
-		// --- إعداد الفورم الجانبي (اليمين) ---
 		VBox formBox = new VBox(10);
 		formBox.setPrefWidth(300);
 		formBox.setMinWidth(300);
@@ -118,7 +116,6 @@ public class AdminRolesInterface extends VBox {
 		emailField = new TextField();
 		emailField.setPromptText("Enter email address");
 
-		// 🔥 تهيئة حقل كلمة المرور الجديد
 		passwordField = new PasswordField();
 		passwordField.setPromptText("Enter account password");
 
@@ -159,9 +156,8 @@ public class AdminRolesInterface extends VBox {
 
 		actionsBox.getChildren().addAll(addBtn, updateBtn, deactivateBtn, refreshBtn);
 
-		// 🔥 إضافة حقل الباسورد للفورم الجانبي اليمين لكي يظهر بشكل منسق وعلمي
 		formBox.getChildren().addAll(formTitle, new Label("Email Address"), emailField, new Label("Password"),
-				passwordField, // زراعة الحقل هان
+				passwordField,
 				new Label("First Name"), firstNameField, new Label("Last Name"), lastNameField,
 				new Label("Phone Number"), phoneField, new Label("Account Role"), roleComboBox, actionsBox);
 
@@ -180,7 +176,7 @@ public class AdminRolesInterface extends VBox {
 				firstNameField.setText(newSelection.getFirstName());
 				lastNameField.setText(newSelection.getLastName());
 				phoneField.setText(newSelection.getPhoneNumber() != null ? newSelection.getPhoneNumber() : "");
-				passwordField.clear(); // أمنياً نترك حقل الباسورد فارغاً عند التحديد لحظر كشف كلمات السر
+				passwordField.clear();
 
 				String rName = newSelection.getRoleName();
 				if (rName != null) {
@@ -198,16 +194,14 @@ public class AdminRolesInterface extends VBox {
 			clearFields();
 		});
 
-		// زر الإضافة المحدث
 		addBtn.setOnAction(e -> {
 			String email = emailField.getText().trim();
-			String password = passwordField.getText().trim(); // 🔥 سحب الباسورد المدخل
+			String password = passwordField.getText().trim();
 			String phone = phoneField.getText().trim();
 			String first = firstNameField.getText().trim();
 			String last = lastNameField.getText().trim();
 			String role = roleComboBox.getValue();
 
-			// الفحص الإلزامي لمنع ترك الباسورد فارغاً
 			if (first.isEmpty() || last.isEmpty() || role == null || password.isEmpty()) {
 				showAlert(Alert.AlertType.WARNING, "Validation Error",
 						"Please fill all personal fields, password, and select a role.");
@@ -224,7 +218,7 @@ public class AdminRolesInterface extends VBox {
 				a.setFirstName(first);
 				a.setLastName(last);
 				a.setPhoneNumber(phone);
-				a.setPassword(password); // 🔥 تمرير الباسورد الديناميكي المكتوب فوراً للداتابيز
+				a.setPassword(password);
 
 				int roleId = 3;
 				if (role.equalsIgnoreCase("Admin")) {
@@ -241,7 +235,6 @@ public class AdminRolesInterface extends VBox {
 			}
 		});
 
-		// زر التعديل
 		updateBtn.setOnAction(e -> {
 			Account selected = table.getSelectionModel().getSelectedItem();
 			if (selected == null) {
@@ -351,7 +344,7 @@ public class AdminRolesInterface extends VBox {
 
 	private void clearFields() {
 		emailField.clear();
-		passwordField.clear(); // تنظيف حقل الباسورد
+		passwordField.clear();
 		firstNameField.clear();
 		lastNameField.clear();
 		phoneField.clear();

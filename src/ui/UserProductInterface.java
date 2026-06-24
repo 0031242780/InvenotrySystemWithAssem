@@ -5,115 +5,107 @@ import dao.ProductDAO;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import model.Account;
 import model.Product;
 
 public class UserProductInterface extends VBox {
 
-	private TableView<Product> table;
+    private TableView<Product> table;
+    private ProductDAO productDAO;
+    private CartDAO cartDAO;
+    private Account account;
+    private Runnable onCartUpdated;
 
-	private ProductDAO productDAO;
-	private CartDAO cartDAO;
+    private Spinner<Integer> quantitySpinner;
 
-	private Account account;
+    public UserProductInterface(Account account, Runnable onCartUpdated) {
+        this.account = account;
+        this.onCartUpdated = onCartUpdated;
 
-	// عرفنا الـ Callback البسيط اللي بربط مع الدشبرد لتحديث العدادات
-	private Runnable onCartUpdated;
+        productDAO = new ProductDAO();
+        cartDAO = new CartDAO();
 
-	public UserProductInterface(Account account, Runnable onCartUpdated) {
+        table = new TableView<>();
 
-		this.account = account;
-		this.onCartUpdated = onCartUpdated;
+        TableColumn<Product, String> nameCol = new TableColumn<>("Name");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
 
-		productDAO = new ProductDAO();
-		cartDAO = new CartDAO();
+        TableColumn<Product, String> barcodeCol = new TableColumn<>("Barcode");
+        barcodeCol.setCellValueFactory(new PropertyValueFactory<>("barcode"));
 
-		table = new TableView<>();
+        TableColumn<Product, Double> priceCol = new TableColumn<>("Price");
+        priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
 
-		TableColumn<Product, Integer> idCol = new TableColumn<>("ID");
-		idCol.setCellValueFactory(new PropertyValueFactory<>("productId"));
+        TableColumn<Product, String> descCol = new TableColumn<>("Description");
+        descCol.setCellValueFactory(new PropertyValueFactory<>("description"));
 
-		TableColumn<Product, String> nameCol = new TableColumn<>("Name");
-		nameCol.setCellValueFactory(new PropertyValueFactory<>("productName"));
+        table.getColumns().addAll(nameCol, barcodeCol, priceCol, descCol);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-		TableColumn<Product, String> barcodeCol = new TableColumn<>("Barcode");
-		barcodeCol.setCellValueFactory(new PropertyValueFactory<>("barcode"));
+        Button refresh = new Button("Refresh");
+        Button addCart = new Button("Add To Cart");
 
-		// ⚠️ السطر الجديد: ضفنا عمود السعر لعرضه للزبون بطريقة عادية ومفهومة
-		TableColumn<Product, Double> priceCol = new TableColumn<>("Price");
-		priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
+        Label qtyLabel = new Label("Qty:");
+        quantitySpinner = new Spinner<>(1, 100, 1);
+        quantitySpinner.setPrefWidth(80);
+        quantitySpinner.setEditable(true);
 
-		TableColumn<Product, String> descCol = new TableColumn<>("Description");
-		descCol.setCellValueFactory(new PropertyValueFactory<>("description"));
+        addCart.setOnAction(e -> {
+            try {
+                Product p = table.getSelectionModel().getSelectedItem();
 
-		// ضفنا الـ priceCol جوا الجدول مع باقي الأعمدة
-		table.getColumns().addAll(idCol, nameCol, barcodeCol, priceCol, descCol);
-		table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+                if (p == null) {
+                    new Alert(Alert.AlertType.WARNING, "Please select a product!").showAndWait();
+                    return;
+                }
 
-		Button refresh = new Button("Refresh");
-		Button addCart = new Button("Add To Cart");
+                int quantity = quantitySpinner.getValue();
 
-		addCart.setOnAction(e -> {
+                CartDAO dao = new CartDAO();
+                int session = dao.getSession(account.getAccountId());
 
-			try {
+                dao.addToCart(session, p.getProductId(), quantity);
 
-				Product p = table.getSelectionModel().getSelectedItem();
+                new Alert(Alert.AlertType.INFORMATION, "Successfully added " + quantity + " item(s) to cart.").showAndWait();
 
-				if (p == null) {
-					new Alert(Alert.AlertType.WARNING, "Please select a product!").showAndWait();
-					return;
-				}
+                quantitySpinner.getValueFactory().setValue(1);
 
-				CartDAO dao = new CartDAO();
+                if (onCartUpdated != null) {
+                    onCartUpdated.run();
+                }
 
-				int session = dao.getSession(account.getAccountId());
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                new Alert(Alert.AlertType.ERROR, "Could not add item to cart: " + ex.getMessage()).showAndWait();
+            }
+        });
 
-				dao.addToCart(session, p.getProductId(), 1);
+        refresh.setOnAction(e -> load());
 
-				new Alert(Alert.AlertType.INFORMATION, "Added to cart").showAndWait();
+        HBox actionBox = new HBox(10);
+        actionBox.setAlignment(Pos.CENTER_LEFT);
+        actionBox.getChildren().addAll(qtyLabel, quantitySpinner, addCart, refresh);
 
-				// تحديث الأرقام في الدشبرد فوراً بعد الإضافة
-				if (onCartUpdated != null) {
-					onCartUpdated.run();
-				}
+        setPadding(new Insets(10));
+        setSpacing(10);
 
-			} catch (Exception ex) {
+        getChildren().addAll(table, actionBox);
+        VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
 
-				ex.printStackTrace();
+        load();
+    }
 
-			}
-
-		});
-		refresh.setOnAction(e -> load());
-
-		setPadding(new Insets(10));
-		setSpacing(10);
-
-		getChildren().addAll(table, addCart, refresh);
-
-		VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
-
-		load();
-
-	}
-
-	private void load() {
-
-		try {
-
-			ObservableList<Product> list = FXCollections.observableArrayList(productDAO.getAllProducts());
-
-			table.setItems(list);
-
-		} catch (Exception e) {
-
-			e.printStackTrace();
-
-		}
-
-	}
-
+    private void load() {
+        try {
+            ObservableList<Product> list = FXCollections.observableArrayList(productDAO.getAllProducts());
+            table.setItems(list);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }

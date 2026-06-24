@@ -8,57 +8,44 @@ import model.OrderItem;
 public class OrderItemDAO {
 
 	public void insert(OrderItem item) throws Exception {
+		String sql = "INSERT INTO order_item(order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)";
 
-		String sql = "INSERT INTO order_item(order_id,product_id,quantity,price_at_purchase) VALUES (?,?,?,?)";
-
-		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+		try (Connection con = DBConnection.getConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
 
 			ps.setInt(1, item.getOrderId());
-
 			ps.setInt(2, item.getProductId());
-
 			ps.setInt(3, item.getQuantity());
-
 			ps.setDouble(4, item.getPriceAtPurchase());
-
 			ps.executeUpdate();
-
 		}
-
 	}
 
-	public int createOrder(double total, int accountId) throws Exception {
+	public int createOrder(int statusId, int accountId) throws Exception {
+		String sql = "INSERT INTO orders(status_id, account_id) VALUES (?, ?)";
 
-		String sql = "INSERT INTO orders(total_price,status_id,account_id) VALUES(?,?,?)";
+		try (Connection con = DBConnection.getConnection();
+				PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-		Connection con = DBConnection.getConnection();
+			ps.setInt(1, statusId);
+			ps.setInt(2, accountId);
+			ps.executeUpdate();
 
-		PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-
-		ps.setDouble(1, total);
-
-		ps.setInt(2, 1);
-
-		ps.setInt(3, accountId);
-
-		ps.executeUpdate();
-
-		ResultSet rs = ps.getGeneratedKeys();
-
-		if (rs.next())
-			return rs.getInt(1);
-
+			try (ResultSet rs = ps.getGeneratedKeys()) {
+				if (rs.next()) {
+					return rs.getInt(1);
+				}
+			}
+		}
 		return -1;
-
 	}
 
 	public ArrayList<OrderItem> getItemsByOrder(int orderId) throws Exception {
 		ArrayList<OrderItem> list = new ArrayList<>();
-
-		// جملة استعلام عادية لجلب قطع طلب معين من جدول order_item
 		String sql = "SELECT * FROM order_item WHERE order_id = ?";
 
-		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+		try (Connection con = DBConnection.getConnection();
+				PreparedStatement ps = con.prepareStatement(sql)) {
 
 			ps.setInt(1, orderId);
 
@@ -69,7 +56,6 @@ public class OrderItemDAO {
 					item.setProductId(rs.getInt("product_id"));
 					item.setQuantity(rs.getInt("quantity"));
 					item.setPriceAtPurchase(rs.getDouble("price_at_purchase"));
-
 					list.add(item);
 				}
 			}

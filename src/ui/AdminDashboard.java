@@ -35,11 +35,12 @@ public class AdminDashboard extends BorderPane {
 		Button delivery = btn("Delivery");
 		Button orders = btn("Orders");
 		Button customers = btn("Customers");
-		Button stock = btn("Stock");
+		Button stock = btn("Stock Movements");
 		Button users = btn("Accounts");
+		Button paymentsBtn = btn("Payments History");
 
 		side.getChildren().addAll(title, dashboard, products, categories, suppliers, delivery, orders, customers, stock,
-				users);
+				users,paymentsBtn);
 		setLeft(side);
 
 		dashboard.setOnAction(e -> showDashboard());
@@ -51,7 +52,7 @@ public class AdminDashboard extends BorderPane {
 		customers.setOnAction(e -> setCenter(new AdminCustomerInterface()));
 		stock.setOnAction(e -> setCenter(new AdminStockMovementInterface()));
 		users.setOnAction(e -> setCenter(new AdminRolesInterface()));
-
+		paymentsBtn.setOnAction(e -> setCenter(new AdminPaymentsInterface()));
 		showDashboard();
 
 		stage.setScene(new javafx.scene.Scene(this, 1100, 700));
@@ -82,11 +83,9 @@ public class AdminDashboard extends BorderPane {
 			TableColumn<Order, Double> totalCol = new TableColumn<>("Total Price");
 			totalCol.setCellValueFactory(new PropertyValueFactory<>("totalPrice"));
 
-			// 🔥 عرض اسم الحالة بدلاً من الـ ID
 			TableColumn<Order, String> statusCol = new TableColumn<>("Status Name");
 			statusCol.setCellValueFactory(new PropertyValueFactory<>("statusName"));
 
-			// 🔥 عرض اسم الزبون كاملاً بدلاً من الـ ID
 			TableColumn<Order, String> userCol = new TableColumn<>("Customer Name");
 			userCol.setCellValueFactory(new PropertyValueFactory<>("customerName"));
 

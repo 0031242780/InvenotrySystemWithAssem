@@ -3,7 +3,6 @@ package ui;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.ArrayList;
 
 import dao.DBConnection;
 import dao.ProductDAO;
@@ -16,10 +15,10 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import model.Product;
 import model.Category;
-import model.Supplier;
 
 public class AdminProductInterface extends VBox {
 
@@ -29,7 +28,7 @@ public class AdminProductInterface extends VBox {
 	private TableColumn<Product, String> barcodeCol;
 	private TableColumn<Product, String> descCol;
 	private TableColumn<Product, String> catCol;
-	private TableColumn<Product, String> supCol;
+	private TableColumn<Product, Integer> quantityCol;
 
 	private TableColumn<Product, Double> costCol;
 	private TableColumn<Product, Double> priceCol;
@@ -39,25 +38,21 @@ public class AdminProductInterface extends VBox {
 	private TextField nameField;
 	private TextField barcodeField;
 	private TextField descField;
-	private TextField priceField;
-	private TextField costField;
 
 	private ComboBox<Category> categoryComboBox;
-	private ComboBox<Supplier> supplierComboBox;
-
-	private TextField discountPercentField;
-	private Button applyDiscountBtn;
 
 	private Button addBtn;
 	private Button editBtn;
 	private Button deleteBtn;
 	private Button refreshBtn;
 
+	private TextField resupplyField;
+	private Button resupplyBtn;
+
 	private ProductDAO productDAO;
 	private ObservableList<Product> productsList = FXCollections.observableArrayList();
 
 	public AdminProductInterface() {
-
 		productDAO = new ProductDAO();
 
 		setSpacing(15);
@@ -82,25 +77,11 @@ public class AdminProductInterface extends VBox {
 		descField = new TextField();
 		form.add(descField, 1, 2);
 
-		form.add(new Label("Category:"), 2, 0);
+		form.add(new Label("Category:"), 0, 3);
 		categoryComboBox = new ComboBox<>();
 		categoryComboBox.setPromptText("Select Category");
 		categoryComboBox.setPrefWidth(150);
-		form.add(categoryComboBox, 3, 0);
-
-		form.add(new Label("Supplier:"), 2, 1);
-		supplierComboBox = new ComboBox<>();
-		supplierComboBox.setPromptText("Select Supplier");
-		supplierComboBox.setPrefWidth(150);
-		form.add(supplierComboBox, 3, 1);
-
-		form.add(new Label("Price ($):"), 2, 2);
-		priceField = new TextField();
-		form.add(priceField, 3, 2);
-
-		form.add(new Label("Cost ($):"), 0, 3);
-		costField = new TextField();
-		form.add(costField, 1, 3);
+		form.add(categoryComboBox, 1, 3);
 
 		createTable();
 
@@ -112,21 +93,20 @@ public class AdminProductInterface extends VBox {
 		deleteBtn = new Button("Delete");
 		refreshBtn = new Button("Refresh");
 
-		discountPercentField = new TextField();
-		discountPercentField.setPromptText("Discount % (e.g. 20)");
-		discountPercentField.setPrefWidth(140);
+		resupplyField = new TextField();
+		resupplyField.setPromptText("Qty (e.g. 50)");
+		resupplyField.setPrefWidth(100);
+		resupplyBtn = new Button("Resupply");
 
-		applyDiscountBtn = new Button("Save Discount State");
-
-		bottomBox.getChildren().addAll(addBtn, editBtn, deleteBtn, refreshBtn, discountPercentField, applyDiscountBtn);
+		bottomBox.getChildren().addAll(addBtn, editBtn, deleteBtn, refreshBtn, resupplyField, resupplyBtn);
 
 		getChildren().addAll(mainTitle, form, table, bottomBox);
+		VBox.setVgrow(table, Priority.ALWAYS);
 
 		setupActions();
 
 		loadData();
 		loadCategoriesToCombo();
-		loadSuppliersToCombo();
 	}
 
 	private void createTable() {
@@ -148,36 +128,76 @@ public class AdminProductInterface extends VBox {
 		catCol = new TableColumn<>("Category");
 		catCol.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
 
-		supCol = new TableColumn<>("Supplier");
-		supCol.setCellValueFactory(new PropertyValueFactory<>("supplierName"));
+		quantityCol = new TableColumn<>("Stock Qty");
+		quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
+		quantityCol.setCellFactory(column -> new TableCell<Product, Integer>() {
+			@Override
+			protected void updateItem(Integer item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null) {
+					setText("-");
+					setStyle("");
+				} else {
+					setText(String.valueOf(item));
+					if (item <= 5) {
+						setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+					} else {
+						setStyle("");
+					}
+				}
+			}
+		});
 
 		costCol = new TableColumn<>("Cost ($)");
 		costCol.setCellValueFactory(new PropertyValueFactory<>("cost"));
-
-		priceCol = new TableColumn<>("Reg. Price ($)");
-		priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
-
-		discountCol = new TableColumn<>("Disc. Price ($)");
-		discountCol.setCellValueFactory(new PropertyValueFactory<>("discountPrice"));
-
-		// 🔥 تلوين السعر بعد الخصم باللون الأخضر هنا
-		discountCol.setCellFactory(column -> new TableCell<Product, Double>() {
+		costCol.setCellFactory(column -> new TableCell<Product, Double>() {
 			@Override
 			protected void updateItem(Double item, boolean empty) {
 				super.updateItem(item, empty);
 				if (empty || item == null) {
 					setText("-");
+				} else {
+					setText(String.format("$%.2f", item));
+				}
+			}
+		});
+
+		priceCol = new TableColumn<>("Reg. Price ($)");
+		priceCol.setCellValueFactory(new PropertyValueFactory<>("price"));
+		priceCol.setCellFactory(column -> new TableCell<Product, Double>() {
+			@Override
+			protected void updateItem(Double item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null) {
+					setText("-");
+				} else {
+					setText(String.format("$%.2f", item));
+				}
+			}
+		});
+
+		discountCol = new TableColumn<>("Final Price ($)");
+		discountCol.setCellValueFactory(new PropertyValueFactory<>("discountPrice"));
+		discountCol.setCellFactory(column -> new TableCell<Product, Double>() {
+			@Override
+			protected void updateItem(Double item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty) {
+					setText(null);
 					setStyle("");
 					return;
 				}
 				Product p = (Product) getTableRow().getItem();
-				if (p == null || item <= 0) {
-					setText("-");
+				if (p == null) {
+					setText(null);
+					setStyle("");
+				} else if (item == null || item <= 0) {
+					setText(String.format("$%.2f", p.getPrice()));
 					setStyle("");
 				} else {
 					double finalPrice = p.getPrice() - item;
 					setText(String.format("$%.2f", finalPrice));
-					setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;"); // السعر الأخضر
+					setStyle("-fx-text-fill: #2ecc71; -fx-font-weight: bold;");
 				}
 			}
 		});
@@ -191,7 +211,6 @@ public class AdminProductInterface extends VBox {
 			}
 			return new SimpleObjectProperty<>(0.0);
 		});
-
 		percentCol.setCellFactory(column -> new TableCell<Product, Double>() {
 			@Override
 			protected void updateItem(Double item, boolean empty) {
@@ -207,31 +226,27 @@ public class AdminProductInterface extends VBox {
 		});
 
 		idCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.04));
-		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
-		barcodeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
-		descCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.15));
-		catCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
-		supCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
-		costCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
-		priceCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
-		discountCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
-		percentCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
+		nameCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.14));
+		barcodeCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.11));
+		descCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.14));
+		catCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.10));
+		quantityCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.08));
+		costCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.08));
+		priceCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.08));
+		discountCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.09));
+		percentCol.prefWidthProperty().bind(table.widthProperty().subtract(2).multiply(0.06));
 
-		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, supCol, costCol, priceCol, discountCol,
-				percentCol);
+		table.getColumns().addAll(idCol, nameCol, barcodeCol, descCol, catCol, quantityCol, costCol, priceCol, discountCol, percentCol);
 		table.setItems(productsList);
 		table.setPrefHeight(350);
 	}
 
 	private void setupActions() {
-
 		table.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
 			if (newSelection != null) {
 				nameField.setText(newSelection.getProductName());
 				barcodeField.setText(newSelection.getBarcode());
 				descField.setText(newSelection.getDescription());
-				priceField.setText(String.valueOf(newSelection.getPrice()));
-				costField.setText(String.valueOf(newSelection.getCost()));
 
 				for (Category c : categoryComboBox.getItems()) {
 					if (c.getCategoryId() == newSelection.getCategoryId()) {
@@ -239,32 +254,15 @@ public class AdminProductInterface extends VBox {
 						break;
 					}
 				}
-
-				for (Supplier s : supplierComboBox.getItems()) {
-					if (s.getSupplierId() == newSelection.getSupplierId()) {
-						supplierComboBox.setValue(s);
-						break;
-					}
-				}
-
-				double originalPrice = newSelection.getPrice();
-				double currentDiscountAmount = newSelection.getDiscountPrice();
-				if (currentDiscountAmount > 0 && originalPrice > 0) {
-					double percent = (currentDiscountAmount / originalPrice) * 100;
-					discountPercentField.setText(String.format("%.0f", percent));
-				} else {
-					discountPercentField.clear();
-				}
 			}
 		});
 
 		addBtn.setOnAction(e -> {
 			try {
 				Category selectedCat = categoryComboBox.getValue();
-				Supplier selectedSup = supplierComboBox.getValue();
 
-				if (selectedCat == null || selectedSup == null) {
-					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category and Supplier from lists!");
+				if (selectedCat == null) {
+					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category from the list!");
 					return;
 				}
 
@@ -273,9 +271,6 @@ public class AdminProductInterface extends VBox {
 				p.setBarcode(barcodeField.getText());
 				p.setDescription(descField.getText());
 				p.setCategoryId(selectedCat.getCategoryId());
-				p.setSupplierId(selectedSup.getSupplierId());
-				p.setPrice(Double.parseDouble(priceField.getText()));
-				p.setCost(Double.parseDouble(costField.getText()));
 
 				productDAO.insertProduct(p);
 				showAlert(Alert.AlertType.INFORMATION, "Success", "Product added successfully!");
@@ -294,10 +289,9 @@ public class AdminProductInterface extends VBox {
 			}
 			try {
 				Category selectedCat = categoryComboBox.getValue();
-				Supplier selectedSup = supplierComboBox.getValue();
 
-				if (selectedCat == null || selectedSup == null) {
-					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category and Supplier from lists!");
+				if (selectedCat == null) {
+					showAlert(Alert.AlertType.WARNING, "Warning", "Please select Category from the list!");
 					return;
 				}
 
@@ -305,23 +299,8 @@ public class AdminProductInterface extends VBox {
 				selected.setBarcode(barcodeField.getText());
 				selected.setDescription(descField.getText());
 				selected.setCategoryId(selectedCat.getCategoryId());
-				selected.setSupplierId(selectedSup.getSupplierId());
-
-				double price = Double.parseDouble(priceField.getText());
-				selected.setPrice(price);
-				selected.setCost(Double.parseDouble(costField.getText()));
-
-				String percentText = discountPercentField.getText().trim();
-				if (!percentText.isEmpty()) {
-					double percent = Double.parseDouble(percentText);
-					double discAmount = price * (percent / 100.0);
-					selected.setDiscountPrice(discAmount);
-				} else {
-					selected.setDiscountPrice(0.0);
-				}
 
 				productDAO.updateProduct(selected);
-				productDAO.addDiscount(selected.getProductId(), selected.getDiscountPrice());
 
 				showAlert(Alert.AlertType.INFORMATION, "Success", "Product updated successfully!");
 				loadData();
@@ -358,50 +337,9 @@ public class AdminProductInterface extends VBox {
 		refreshBtn.setOnAction(e -> {
 			loadData();
 			loadCategoriesToCombo();
-			loadSuppliersToCombo();
 		});
 
-		applyDiscountBtn.setOnAction(e -> {
-			Product selectedProduct = table.getSelectionModel().getSelectedItem();
-
-			if (selectedProduct == null) {
-				showAlert(Alert.AlertType.WARNING, "Warning", "Please select a product from the table first!");
-				return;
-			}
-
-			try {
-				String percentText = discountPercentField.getText().trim();
-				double calculatedDiscountAmount = 0;
-				String message = "";
-
-				if (!percentText.isEmpty()) {
-					double percent = Double.parseDouble(percentText);
-
-					if (percent < 0 || percent > 100) {
-						showAlert(Alert.AlertType.ERROR, "Input Error", "Percentage must be between 0 and 100!");
-						return;
-					}
-
-					calculatedDiscountAmount = selectedProduct.getPrice() * (percent / 100.0);
-					double finalPrice = selectedProduct.getPrice() - calculatedDiscountAmount;
-					message = percent + "% Discount applied successfully! New Price: $"
-							+ String.format("%.2f", finalPrice);
-				} else {
-					calculatedDiscountAmount = 0;
-					message = "Discount removed successfully! Product returned to original price.";
-				}
-
-				productDAO.addDiscount(selectedProduct.getProductId(), calculatedDiscountAmount);
-
-				showAlert(Alert.AlertType.INFORMATION, "Success", message);
-				loadData();
-
-			} catch (NumberFormatException nfe) {
-				showAlert(Alert.AlertType.ERROR, "Input Error", "Please enter a valid number for discount percentage!");
-			} catch (Exception ex) {
-				showExceptionAlert("Discount Process Failed", ex);
-			}
-		});
+		resupplyBtn.setOnAction(e -> handleResupply());
 	}
 
 	private void loadCategoriesToCombo() {
@@ -422,24 +360,6 @@ public class AdminProductInterface extends VBox {
 		}
 	}
 
-	private void loadSuppliersToCombo() {
-		ObservableList<Supplier> options = FXCollections.observableArrayList();
-		String sql = "SELECT supplier_id, company_name FROM supplier WHERE is_active = true";
-		try (Connection con = DBConnection.getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				ResultSet rs = ps.executeQuery()) {
-			while (rs.next()) {
-				Supplier s = new Supplier();
-				s.setSupplierId(rs.getInt("supplier_id"));
-				s.setCompanyName(rs.getString("company_name"));
-				options.add(s);
-			}
-			supplierComboBox.setItems(options);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
 	private void loadData() {
 		try {
 			productsList.clear();
@@ -454,11 +374,8 @@ public class AdminProductInterface extends VBox {
 		nameField.clear();
 		barcodeField.clear();
 		descField.clear();
-		priceField.clear();
-		costField.clear();
 		categoryComboBox.setValue(null);
-		supplierComboBox.setValue(null);
-		discountPercentField.clear();
+		resupplyField.clear();
 		table.getSelectionModel().clearSelection();
 	}
 
@@ -492,5 +409,45 @@ public class AdminProductInterface extends VBox {
 
 		alert.getDialogPane().setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
 		alert.showAndWait();
+	}
+
+	private void handleResupply() {
+		Product selected = table.getSelectionModel().getSelectedItem();
+		if (selected == null) {
+			showAlert(Alert.AlertType.WARNING, "Warning", "Please select a product from the table first!");
+			return;
+		}
+
+		if (selected.getCost() <= 0) {
+			showAlert(Alert.AlertType.WARNING, "Supply Line Restriction", "This product cannot be resupplied because it is not linked to an active supplier source. Please map this product to a supplier vendor first.");
+			return;
+		}
+
+		String amountText = resupplyField.getText().trim();
+		if (amountText.isEmpty()) {
+			showAlert(Alert.AlertType.WARNING, "Warning", "Please enter a quantity to resupply.");
+			return;
+		}
+
+		try {
+			int addedQuantity = Integer.parseInt(amountText);
+			if (addedQuantity <= 0) {
+				showAlert(Alert.AlertType.ERROR, "Error", "Quantity must be greater than zero.");
+				return;
+			}
+
+			productDAO.updateStock(selected.getProductId(), addedQuantity);
+
+			dao.PaymentDAO paymentDAO = new dao.PaymentDAO();
+			paymentDAO.insertWholesaleExpense(selected.getProductId(), selected.getCost(), addedQuantity);
+
+			showAlert(Alert.AlertType.INFORMATION, "Success", "Stock resupplied and wholesale payment ledger entry logged successfully!");
+			resupplyField.clear();
+			loadData();
+		} catch (NumberFormatException ex) {
+			showAlert(Alert.AlertType.ERROR, "Error", "Please enter a valid whole number for quantity.");
+		} catch (Exception ex) {
+			showExceptionAlert("Resupply Action Failed", ex);
+		}
 	}
 }

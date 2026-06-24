@@ -41,7 +41,7 @@ public class SignupInterface {
 		createLayout();
 		createActions();
 
-		scene = new Scene(root, 400, 420); // زدنا الحجم تكّة عشان يستوعب التقسيمة الجديدة براحة
+		scene = new Scene(root, 400, 420);
 		stage.setScene(scene);
 		stage.show();
 	}
@@ -115,28 +115,23 @@ public class SignupInterface {
 		String last = lastField.getText().trim();
 		String phone = phoneField.getText().trim();
 
-		// 1️⃣ فحص الحقول الإلزامية الأساسية لمنع إدخال بيانات فارغة
 		if (email.isEmpty() || password.isEmpty() || first.isEmpty() || last.isEmpty() || phone.isEmpty()) {
 			showAlert(Alert.AlertType.WARNING, "Validation Error", null, "Please fill all required fields.");
 			return;
 		}
 
-		// 2️⃣ 🔥 فحص رقم الهاتف الصارم (يجب أن يتكون من 10 خانات رقمية بالظبط)
 		if (!phone.matches("\\d{10}")) {
 			showAlert(Alert.AlertType.WARNING, "Input Error", null,
 					"Phone number is invalid! It must consist of exactly 10 digits.");
 			return;
 		}
 
-		// 3️⃣ فحص بنية الإيميل الأساسية لحماية السيستم
 		String emailRegex = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$";
 		if (!email.matches(emailRegex)) {
 			showAlert(Alert.AlertType.WARNING, "Input Error", null, "The email address format is invalid.");
 			return;
 		}
 
-		// 4️⃣ حماية النطاق الأمني: منع الزبائن العاديين من تسجيل حساب بنطاق الآدمن
-		// @tech.com
 		if (email.toLowerCase().endsWith("@tech.com")) {
 			showAlert(Alert.AlertType.ERROR, "Access Denied", null,
 					"Security Violation! Regular users cannot register using the corporate admin domain.");
@@ -153,15 +148,15 @@ public class SignupInterface {
 			a.setCity(cityField.getText().trim());
 			a.setStreet(streetField.getText().trim());
 
-			// حساب زبون عادي تلقائياً يأخذ الرقم 3
-			a.setRoleId(3);
+
+			a.setRoleId(1);
 
 			dao.insert(a);
 
 			showAlert(Alert.AlertType.INFORMATION, "Success", null, "Account Created Successfully!");
 			clearFields();
 
-			// بعد النجاح، بنرجعه تلقائياً على شاشة الـ Login عشان يسجل دخول
+
 			new LoginInterface(stage);
 
 		} catch (Exception e) {
@@ -179,7 +174,7 @@ public class SignupInterface {
 		streetField.clear();
 	}
 
-	// دالة التنبيه المعدلة والمحمية هندسياً لتناسب الحجم التلقائي الملموم
+
 	private void showAlert(Alert.AlertType type, String title, String header, String content) {
 		Alert alert = new Alert(type);
 		alert.setTitle(title);

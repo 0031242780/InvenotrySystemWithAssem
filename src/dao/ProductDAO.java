@@ -4,213 +4,261 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import model.Product;
+import model.Provide;
 
 public class ProductDAO {
 
-	// 1️⃣ جلب كل المنتجات: أضفنا الاسم المستعار pp.cost AS actual_cost لمنع التضارب
-	public ArrayList<Product> getAllProducts() throws Exception {
-		ArrayList<Product> list = new ArrayList<>();
-		String sql = """
-				SELECT p.*, c.category_name, s.company_name AS supplier_name, pp.cost AS actual_cost
+    private static final double WHOLESALE_MARKUP = 1.20;
+    private static final double RETAIL_MARKUP = 1.50;
+
+    public ArrayList<Product> getAllProducts() throws Exception {
+        ArrayList<Product> list = new ArrayList<>();
+        String sql = """
+				SELECT p.*, c.category_name, i.quantity_in_stock AS stock_qty,
+				       (SELECT MIN(cost) FROM provide WHERE product_id = p.product_id) AS lowest_cost,
+				       (SELECT d.discounted_price FROM discount d 
+				        WHERE d.product_id = p.product_id AND NOW() BETWEEN d.start_date AND d.end_date 
+				        LIMIT 1) AS active_discount
 				FROM product p
 				LEFT JOIN category c ON p.category_id = c.category_id
-				LEFT JOIN supplier s ON p.supplier_id = s.supplier_id
-				LEFT JOIN product_pricing pp ON p.product_id = pp.product_id
+				LEFT JOIN inventory i ON p.product_id = i.product_id
 				""";
-		try (Connection con = DBConnection.getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				ResultSet rs = ps.executeQuery()) {
-			while (rs.next()) {
-				Product p = new Product();
-				p.setProductId(rs.getInt("product_id"));
-				p.setProductName(rs.getString("product_name"));
-				p.setBarcode(rs.getString("barcode"));
-				p.setDescription(rs.getString("descrption"));
-				p.setCategoryId(rs.getInt("category_id"));
-				p.setSupplierId(rs.getInt("supplier_id"));
-				p.setPrice(rs.getDouble("price"));
-				p.setDiscountPrice(rs.getDouble("discount_price"));
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Product p = new Product();
+                p.setProductId(rs.getInt("product_id"));
+                p.setProductName(rs.getString("product_name"));
+                p.setBarcode(rs.getString("barcode"));
+                p.setDescription(rs.getString("descrption"));
+                p.setCategoryId(rs.getInt("category_id"));
+                p.setCategoryName(rs.getString("category_name"));
+                p.setQuantity(rs.getInt("stock_qty"));
 
-				// 🔥 القراءة من الاسم المستعار الجديد لمنع قراءة الصفر الافتراضي
-				p.setCost(rs.getDouble("actual_cost"));
+                double baseCost = rs.getDouble("lowest_cost");
+                p.setCost(baseCost);
+                p.setWholeSalePrice(baseCost * WHOLESALE_MARKUP);
+                p.setPrice(baseCost * RETAIL_MARKUP);
 
-				p.setCategoryName(rs.getString("category_name"));
-				p.setSupplierName(rs.getString("supplier_name"));
+                p.setDiscountPrice(rs.getDouble("active_discount"));
 
-				list.add(p);
-			}
-		}
-		return list;
-	}
+                list.add(p);
+            }
+        }
+        return list;
+    }
 
-	// ➕ دالة إضافة منتج جديد: بتسجل بالمنتج، والأسعار، وبتخلق سطر بالمخزن والحركات
-	// تلقائياً!
-	public void insertProduct(Product p) throws Exception {
-		String sqlProduct = "INSERT INTO product (product_name, barcode, descrption, category_id, supplier_id, price) VALUES (?, ?, ?, ?, ?, ?)";
-		String sqlPricing = "INSERT INTO product_pricing (product_id, cost) VALUES (?, ?)";
+    public void insertProduct(Product p) throws Exception {
+        String sqlProduct = "INSERT INTO product (product_name, barcode, descrption, category_id) VALUES (?, ?, ?, ?)";
 
-		try (Connection con = DBConnection.getConnection()) {
-			con.setAutoCommit(false); // نظام العمليات المترابطة لحماية الجداول
-			try {
-				// 1. حفظ البيانات الأساسية في جدول product
-				try (PreparedStatement psProd = con.prepareStatement(sqlProduct,
-						java.sql.Statement.RETURN_GENERATED_KEYS)) {
-					psProd.setString(1, p.getProductName());
-					psProd.setString(2, p.getBarcode());
-					psProd.setString(3, p.getDescription());
-					psProd.setInt(4, p.getCategoryId());
-					psProd.setInt(5, p.getSupplierId());
-					psProd.setDouble(6, p.getPrice());
-					psProd.executeUpdate();
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                try (PreparedStatement psProd = con.prepareStatement(sqlProduct, Statement.RETURN_GENERATED_KEYS)) {
+                    psProd.setString(1, p.getProductName());
+                    psProd.setString(2, p.getBarcode());
+                    psProd.setString(3, p.getDescription());
+                    psProd.setInt(4, p.getCategoryId());
+                    psProd.executeUpdate();
 
-					// الحصول على الـ ID الجديد اللي تولد أوتوماتيكياً
-					try (ResultSet generatedKeys = psProd.getGeneratedKeys()) {
-						if (generatedKeys.next()) {
-							int newProductId = generatedKeys.getInt(1);
+                    try (ResultSet generatedKeys = psProd.getGeneratedKeys()) {
+                        if (generatedKeys.next()) {
+                            int newProductId = generatedKeys.getInt(1);
 
-							// 2. حفظ الكوست في جدول الـ product_pricing المربوط
-							try (PreparedStatement psPrice = con.prepareStatement(sqlPricing)) {
-								psPrice.setInt(1, newProductId);
-								psPrice.setDouble(2, p.getCost());
-								psPrice.executeUpdate();
-							}
+                            StockMovementDAO.logMovementAndUpdateStock(newProductId, 0, 1,
+                                    "Initial Stock Setup via Product Creation", 1, con);
+                        }
+                    }
+                }
+                con.commit();
+            } catch (Exception ex) {
+                con.rollback();
+                throw ex;
+            }
+        }
+    }
 
-							// 3. 🔥 الربط الأوتوماتيكي: استدعاء دالة الحركات لتخلق سطر المخزن والحركة
-							// أوتوماتيكياً فوراً!
-							StockMovementDAO.logMovementAndUpdateStock(newProductId, 0, 1,
-									"Initial Stock Setup via Product Creation", 1, con);
-						}
-					}
-				}
-				con.commit(); // اعتماد الحفظ لجميع الجداول معاً بنجاح
-			} catch (Exception ex) {
-				con.rollback(); // تراجع عن كل شيء لو صار أي خطأ منعاً لتشوه البيانات
-				throw ex;
-			}
-		}
-	}
+    public void updateProduct(Product p) throws Exception {
+        String sqlProduct = "UPDATE product SET product_name = ?, barcode = ?, descrption = ?, category_id = ? WHERE product_id = ?";
 
-	// 3️⃣ تعديل منتج قائم
-	public void updateProduct(Product p) throws Exception {
-		String sqlProduct = "UPDATE product SET product_name = ?, barcode = ?, descrption = ?, category_id = ?, supplier_id = ?, price = ? WHERE product_id = ?";
-		String sqlPricing = """
-				INSERT INTO product_pricing (product_id, cost) VALUES (?, ?)
-				ON DUPLICATE KEY UPDATE cost = ?
-				""";
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                try (PreparedStatement psProd = con.prepareStatement(sqlProduct)) {
+                    psProd.setString(1, p.getProductName());
+                    psProd.setString(2, p.getBarcode());
+                    psProd.setString(3, p.getDescription());
+                    psProd.setInt(4, p.getCategoryId());
+                    psProd.setInt(5, p.getProductId());
+                    psProd.executeUpdate();
+                }
+                con.commit();
+            } catch (Exception ex) {
+                con.rollback();
+                throw ex;
+            }
+        }
+    }
 
-		try (Connection con = DBConnection.getConnection()) {
-			con.setAutoCommit(false);
-			try {
-				try (PreparedStatement psProd = con.prepareStatement(sqlProduct)) {
-					psProd.setString(1, p.getProductName());
-					psProd.setString(2, p.getBarcode());
-					psProd.setString(3, p.getDescription());
-					psProd.setInt(4, p.getCategoryId());
-					psProd.setInt(5, p.getSupplierId());
-					psProd.setDouble(6, p.getPrice());
-					psProd.setInt(7, p.getProductId());
-					psProd.executeUpdate();
-				}
+    public void deleteProduct(int id) throws Exception {
+        String sql = "DELETE FROM product WHERE product_id = ?";
+        try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        }
+    }
 
-				try (PreparedStatement psPrice = con.prepareStatement(sqlPricing)) {
-					psPrice.setInt(1, p.getProductId());
-					psPrice.setDouble(2, p.getCost());
-					psPrice.setDouble(3, p.getCost());
-					psPrice.executeUpdate();
-				}
-				con.commit();
-			} catch (Exception ex) {
-				con.rollback();
-				throw ex;
-			}
-		}
-	}
+    public void addDiscount(int productId, Timestamp startDate, Timestamp endDate, double discountedPrice) throws Exception {
+        String sql = "INSERT INTO discount (product_id, start_date, end_date, discounted_price) VALUES (?, ?, ?, ?)";
+        try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, productId);
+            ps.setTimestamp(2, startDate);
+            ps.setTimestamp(3, endDate);
+            ps.setDouble(4, discountedPrice);
+            ps.executeUpdate();
+        }
+    }
 
-	// 4️⃣ حذف منتج
-	public void deleteProduct(int id) throws Exception {
-		String sql = "DELETE FROM product WHERE product_id = ?";
-		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, id);
-			ps.executeUpdate();
-		}
-	}
-
-	// 5️⃣ حفظ الخصم المئوي
-	public void addDiscount(int productId, double discountAmount) throws Exception {
-		String sql = "UPDATE product SET discount_price = ? WHERE product_id = ?";
-		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setDouble(1, discountAmount);
-			ps.setInt(2, productId);
-			ps.executeUpdate();
-		}
-	}
-
-	// 6️⃣ دالة شاشة الكاتيجوري الفخمة: أضفنا أيضاً الاسم المستعار actual_cost هان
-	// لمنع التعليق
-	public ArrayList<Product> getProductsByCategory(int categoryId) throws Exception {
-		ArrayList<Product> list = new ArrayList<>();
-		String sql = """
-				SELECT p.*, pp.cost AS actual_cost
+    public ArrayList<Product> getProductsByCategory(int categoryId) throws Exception {
+        ArrayList<Product> list = new ArrayList<>();
+        String sql = """
+				SELECT p.*, i.quantity_in_stock AS stock_qty,
+				       (SELECT MIN(cost) FROM provide WHERE product_id = p.product_id) AS lowest_cost,
+				       (SELECT d.discounted_price FROM discount d 
+				        WHERE d.product_id = p.product_id AND NOW() BETWEEN d.start_date AND d.end_date 
+				        LIMIT 1) AS active_discount
 				FROM product p
-				LEFT JOIN product_pricing pp ON p.product_id = pp.product_id
+				LEFT JOIN inventory i ON p.product_id = i.product_id
 				WHERE p.category_id = ?
 				""";
-		try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, categoryId);
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					Product p = new Product();
-					p.setProductId(rs.getInt("product_id"));
-					p.setProductName(rs.getString("product_name"));
-					p.setBarcode(rs.getString("barcode"));
-					p.setDescription(rs.getString("descrption"));
-					p.setCategoryId(rs.getInt("category_id"));
-					p.setSupplierId(rs.getInt("supplier_id"));
-					p.setPrice(rs.getDouble("price"));
-					p.setDiscountPrice(rs.getDouble("discount_price"));
+        try (Connection con = DBConnection.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, categoryId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Product p = new Product();
+                    p.setProductId(rs.getInt("product_id"));
+                    p.setProductName(rs.getString("product_name"));
+                    p.setBarcode(rs.getString("barcode"));
+                    p.setDescription(rs.getString("descrption"));
+                    p.setCategoryId(rs.getInt("category_id"));
+                    p.setQuantity(rs.getInt("stock_qty"));
 
-					p.setCost(rs.getDouble("actual_cost"));
-					list.add(p);
-				}
-			}
-		}
-		return list;
-	}
+                    double baseCost = rs.getDouble("lowest_cost");
+                    p.setCost(baseCost);
+                    p.setWholeSalePrice(baseCost * WHOLESALE_MARKUP);
+                    p.setPrice(baseCost * RETAIL_MARKUP);
 
-	public int countProducts() throws Exception {
-		String sql = "SELECT COUNT(*) FROM product";
-		try (Connection con = DBConnection.getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				ResultSet rs = ps.executeQuery()) {
-			if (rs.next()) {
-				return rs.getInt(1);
-			}
-		}
-		return 0;
-	}// 📦 جلب كمية منتج معين من المستودع بواسطة الـ ID
-		// 📦 دالة جلب كل المنتجات مع كمياتها الحالية من جدول المخزن (خاصة بشاشة الـ
-		// Stock)
+                    p.setDiscountPrice(rs.getDouble("active_discount"));
 
-	public ArrayList<Product> getInventory() throws Exception {
-		ArrayList<Product> list = new ArrayList<>();
-		String sql = """
-				SELECT p.product_id, p.product_name, COALESCE(i.quantity_in_stock, 0) AS stock_qty
+                    list.add(p);
+                }
+            }
+        }
+        return list;
+    }
+
+    public int countProducts() throws Exception {
+        String sql = "SELECT COUNT(*) FROM product";
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        }
+        return 0;
+    }
+
+    public ArrayList<Product> getInventory() throws Exception {
+        ArrayList<Product> list = new ArrayList<>();
+        String sql = """
+				SELECT p.product_id, p.product_name, i.quantity_in_stock AS stock_qty
 				FROM product p
 				LEFT JOIN inventory i ON p.product_id = i.product_id
 				""";
-		try (Connection con = DBConnection.getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				ResultSet rs = ps.executeQuery()) {
-			while (rs.next()) {
-				Product p = new Product();
-				p.setProductId(rs.getInt("product_id"));
-				p.setProductName(rs.getString("product_name"));
-				p.setQuantity(rs.getInt("stock_qty")); // تخزين الكمية المجلوبة في الحقل الجديد
-				list.add(p);
-			}
-		}
-		return list;
-	}
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Product p = new Product();
+                p.setProductId(rs.getInt("product_id"));
+                p.setProductName(rs.getString("product_name"));
+                p.setQuantity(rs.getInt("stock_qty"));
+                list.add(p);
+            }
+        }
+        return list;
+    }
+
+    public ArrayList<Product> getProductsBySupplierId(int supplierId) throws Exception {
+        ArrayList<Product> list = new ArrayList<>();
+        String sql = """
+				SELECT p.product_id, p.product_name, p.barcode, p.price,
+				       c.category_name, pr.cost 
+				FROM provide pr
+				INNER JOIN product p ON pr.product_id = p.product_id
+				INNER JOIN category c ON p.category_id = c.category_id
+				WHERE pr.supplier_id = ?
+				ORDER BY p.product_name ASC
+				""";
+
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, supplierId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Product p = new Product();
+                    p.setProductId(rs.getInt("product_id"));
+                    p.setProductName(rs.getString("product_name"));
+                    p.setBarcode(rs.getString("barcode"));
+                    p.setPrice(rs.getDouble("price"));
+                    p.setCategoryName(rs.getString("category_name"));
+
+                    p.setCost(rs.getDouble("cost"));
+
+                    list.add(p);
+                }
+            }
+        }
+        return list;
+    }
+
+    public void addProductSupplierLink(int productId, int supplierId, double supplyCost) throws Exception {
+        String sql = "INSERT INTO provide (product_id, supplier_id, cost) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cost = ?";
+        try (Connection con = DBConnection.getConnection();
+                PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, productId);
+            ps.setInt(2, supplierId);
+            ps.setDouble(3, supplyCost);
+            ps.setDouble(4, supplyCost);
+            ps.executeUpdate();
+        }
+    }
+
+    public void updateStock(int productId, int addedQuantity) throws Exception {
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                int replenishmentType = 1;
+                StockMovementDAO.logMovementAndUpdateStock(
+                        productId,
+                        addedQuantity,
+                        replenishmentType,
+                        "Manual Resupply Increment Adjustment Pattern Run",
+                        1,
+                        con
+                );
+                con.commit();
+            } catch (Exception ex) {
+                con.rollback();
+                throw ex;
+            }
+        }
+    }
 }
